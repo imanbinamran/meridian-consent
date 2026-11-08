@@ -4,16 +4,16 @@ A four-page news site with a cookie consent gate and an admin portal to view the
 
 **Live:** [TK: live URL] · **Admin:** [TK: live URL]/admin, `admin@meridian.test` / [TK: password shared separately]
 
-| Brief | Where it lives |
-| --- | --- |
-| 4 pages, mobile friendly | `/`, `/about`, `/privacy`, `/terms`. Checked from 320px up, light and dark, and right to left. |
-| Consent box on first visit, page can't scroll | The server decides, so the scroll lock is in the first HTML, before any JavaScript runs. |
-| Exact copy, with links to Terms and Privacy | `resources/js/components/site/consent/consent-dialog.tsx` |
-| Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | `consent` cookie plus a row in `consents` |
-| Box stays away until the cookie expires or is gone | Checked on the server on every page |
-| Decline: cookie with the time, lasts 1 day | `consent_declined` cookie |
-| Bonus: secured admin portal | `/admin`: overview, 30-day chart, searchable table, CSV export |
-| Database scripts | `database/migrations`, plus `database/schema.sql` as plain SQL |
+| Brief                                                                          | Where it lives                                                                                 |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 4 pages, mobile friendly                                                       | `/`, `/about`, `/privacy`, `/terms`. Checked from 320px up, light and dark, and right to left. |
+| Consent box on first visit, page can't scroll                                  | The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.       |
+| Exact copy, with links to Terms and Privacy                                    | `resources/js/components/site/consent/consent-dialog.tsx`                                      |
+| Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | `consent` cookie plus a row in `consents`                                                      |
+| Box stays away until the cookie expires or is gone                             | Checked on the server on every page                                                            |
+| Decline: cookie with the time, lasts 1 day                                     | `consent_declined` cookie                                                                      |
+| Bonus: secured admin portal                                                    | `/admin`: overview, 30-day chart, searchable table, CSV export                                 |
+| Database scripts                                                               | `database/migrations`, plus `database/schema.sql` as plain SQL                                 |
 
 ## Run it locally
 
@@ -56,6 +56,7 @@ consent_declined  2026-11-08T09:30:15Z                                          
 The `consent` value is URL-encoded in transit because it contains commas. DevTools shows it decoded.
 
 **When the box comes back.** The server treats a cookie as missing when it has expired or when it doesn't check out. A cookie doesn't check out when:
+
 - it isn't valid JSON,
 - the GUID isn't a v4 UUID,
 - the time is in the future or over a year old,
