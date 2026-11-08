@@ -1,0 +1,1107 @@
+# case-spec/1 · public site and cookie consent
+#
+# Layer tags on every case say who proves it:
+#   pest   -> tests/Feature (PHP feature test, server side)
+#   e2e    -> tests/e2e (Playwright, real browser)
+#   manual -> a person, once before hand-in
+contract: case-spec/1
+title: Meridian · public site and cookie consent
+feature: Four public pages with a blocking cookie consent box that records acceptances
+status: draft
+owner: Amirul
+
+sources:
+    - {
+          id: S1,
+          kind: other,
+          ref: 'Take-home brief (graded): 4 pages, consent box, accept/decline cookies, admin bonus',
+      }
+    - {
+          id: S2,
+          kind: chat,
+          ref: 'Design decisions agreed for this build (cookie names, JSON value, versioning, decline count, Cookie settings)',
+      }
+    - {
+          id: S3,
+          kind: code,
+          ref: 'config/consent.php, database/migrations/2026_11_08_00000{1,2}_*.php',
+      }
+
+requirements:
+    - id: REQ-1
+      text: The site has four public pages (Home/Overview, About/Contact, Privacy Policy, Terms & Conditions) at /, /about, /privacy, /terms
+      anchor: 'S1 pages'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-2
+      text: Every page is usable on a phone (no horizontal scroll at 375px, navigation reachable)
+      anchor: 'S1 mobile-friendly'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-3
+      text: On a first visit to any of the four pages the consent box is shown
+      anchor: 'S1 consent box, first visit'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-4
+      text: While the consent box is open the page cannot scroll; scrolling returns after Accept or Decline
+      anchor: 'S1 consent box, scroll lock'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-5
+      text: The consent box shows the two required sentences word for word
+      anchor: 'S1 consent box text'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-6
+      text: In the box, 'Terms & Conditions' links to the Terms page and 'Privacy Statement' links to the Privacy page
+      anchor: 'S1 consent box links'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-7
+      text: Accept sets a cookie holding a GUID, the acceptance date and time, and version 1
+      anchor: 'S1 accept cookie contents'
+      risk: { impact: 3, likelihood: 3 }
+    - id: REQ-8
+      text: The accept cookie expires one year after acceptance
+      anchor: 'S1 accept cookie expiry'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-9
+      text: The GUID, acceptance time and version are stored in the database
+      anchor: 'S1 accept stored in database'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-10
+      text: After Accept the box is not shown again while the accept cookie is present and not expired
+      anchor: 'S1 accept, box not shown again'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-11
+      text: The box is shown again when the accept cookie has expired or is absent
+      anchor: 'S1 accept, expired or absent'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-12
+      text: Decline sets a cookie holding the decline date and time that expires after one day
+      anchor: 'S1 decline cookie'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-13
+      text: While the decline cookie is present the box is not shown
+      anchor: 'S1 decline (box reappears only after expiry or absence, so it stays hidden while valid)'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-14
+      text: The box is shown again when the decline cookie has expired or is absent
+      anchor: 'S1 decline, expired or absent'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-15
+      text: Cookies are named 'consent' (value JSON {guid, accepted_at ISO UTC, version}) and 'consent_declined' (value ISO UTC time), stored unencrypted so they are readable in DevTools
+      anchor: 'S2 cookie format; S3 config/consent.php cookies'
+      risk: { impact: 2, likelihood: 3 }
+    - id: REQ-16
+      text: Raising CONSENT_VERSION makes an accept cookie with an older version count as absent, so the box is shown again
+      anchor: 'S2 versioning; S3 config/consent.php version'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-17
+      text: Each decline adds one anonymous row to consent_declines (version and time only, no GUID, IP or user agent)
+      anchor: 'S2 decline count; S3 consent_declines migration'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-18
+      text: Accept is idempotent; repeating it for the same GUID does not create a second database row
+      anchor: 'S2 idempotent accept'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-19
+      text: A 'Cookie settings' button in the footer reopens the consent box
+      anchor: 'S2 Cookie settings'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-20
+      text: An accept cookie whose value is not valid (not JSON, bad GUID, missing fields) counts as absent
+      anchor: 'S2 tampered cookie'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-21
+      text: The box can only be closed by Accept or Decline (Escape and clicks outside do not close it)
+      anchor: "S1 'cannot scroll until accept or decline'; S2 Esc does not close"
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-22
+      text: The public pages and the consent box have no serious or critical accessibility violations
+      anchor: 'S2 a11y scan (WCAG 2.2 AA)'
+      risk: { impact: 2, likelihood: 2 }
+
+scope:
+    in:
+        - The four public pages and their navigation
+        - Consent box display, copy, links, scroll lock and dismissal rules
+        - Accept and decline cookies, their values and lifetimes
+        - Database rows written by accept and decline
+        - Versioned re-prompt and Cookie settings
+    out:
+        - {
+              item: 'Waiting a real year or day for cookie expiry',
+              reason: "Not practical; expiry is proven by the cookie's Expires attribute and by simulating an expired or absent cookie",
+          }
+        - {
+              item: 'Blocking non-essential scripts until consent',
+              reason: 'Brief has no analytics or third-party scripts to gate',
+          }
+        - {
+              item: 'Browsers other than Chromium',
+              reason: 'Brief names no browser matrix; Chromium desktop plus a Pixel 7 profile covers desktop and mobile layouts',
+          }
+        - { item: 'Admin portal', reason: 'Covered by tests/cases/admin.yaml' }
+
+roles:
+    - { id: visitor, auth_env: [] }
+
+environments: [local, ci]
+
+fixtures:
+    - id: F1
+      text: 'Fresh browser context with no cookies and no local storage'
+      setup: 'New browser context per test'
+      cleanup: 'Context closed at the end of the test'
+    - id: F2
+      text: 'Empty consents and consent_declines tables (Pest RefreshDatabase)'
+      setup: 'RefreshDatabase trait'
+      cleanup: 'Rolled back by RefreshDatabase'
+
+assumptions:
+    - id: AS-1
+      text: 'Accept and decline are POST endpoints (Pest uses the route names the app defines; e2e only clicks the buttons)'
+      status: open
+    - id: AS-2
+      text: "Server and test runner clocks agree within 30 s, so 'acceptance time is now' is checked with a 30 s tolerance"
+      status: confirmed
+      by: "Build orchestrator (S2: 'within a few seconds of now')"
+      at: '2026-11-08'
+    - id: AS-3
+      text: 'Cookie lifetime checks allow plus or minus 1 day for timezone and rounding (365 days and 1 day nominal)'
+      status: confirmed
+      by: "Build orchestrator (S2: '±1 day tolerance')"
+      at: '2026-11-08'
+    - id: AS-4
+      text: "Phone layout uses a menu button whose accessible name contains 'menu' to reveal the page links"
+      status: open
+
+cases:
+    # ---------- pages and layout ----------
+    - id: CON-001
+      title: Each of the four public pages loads with HTTP 200 and its own heading
+      type: hybrid
+      scenario_class: render
+      priority: P2
+      technique: equivalence
+      required: true
+      mutates: none
+      requirement_refs: [REQ-1]
+      role: visitor
+      preconditions: [Fixture F1]
+      data: { routes: ['/', '/about', '/privacy', '/terms'] }
+      steps:
+          - Open each route in turn
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Status,
+                expected: 'Each route responds 200',
+                provenance: REQ-1,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Heading,
+                expected: "Each page shows a level-1 heading; /privacy heading contains 'Privacy' and /terms heading contains 'Terms'",
+                provenance: REQ-1,
+            }
+      tags: [pest, e2e, smoke]
+      notes: 'Pest: GET each route returns 200 and the Inertia component. e2e: consent.spec.ts loops the four pages.'
+
+    - id: CON-002
+      title: No horizontal scroll on any page at 375px wide
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: compatibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-2]
+      role: visitor
+      preconditions: [Fixture F1, 'Viewport 375x812']
+      data: { routes: ['/', '/about', '/privacy', '/terms'] }
+      steps:
+          - Open each route with the consent box open
+          - Accept the consent box
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Fits width with box open,
+                expected: 'document.scrollingElement.scrollWidth <= window.innerWidth on every route',
+                provenance: REQ-2,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Fits width after accept,
+                expected: 'document.scrollingElement.scrollWidth <= window.innerWidth on every route after Accept',
+                provenance: REQ-2,
+            }
+      cleanup: 'none needed: fresh context per test; the consent row is harmless test data'
+      tags: [e2e]
+      notes: 'responsive.spec.ts'
+
+    - id: CON-003
+      title: Mobile menu opens and links to the other pages
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: compatibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-2]
+      role: visitor
+      preconditions: [Fixture F1, 'Viewport 375x812', 'Consent accepted']
+      steps:
+          - Open /
+          - Activate the menu button
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Links revealed,
+                expected: "Links named 'About', 'Privacy' and 'Terms' (or longer names containing them) become visible",
+                provenance: AS-4,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'responsive.spec.ts'
+
+    - id: CON-004
+      title: Site looks right on a real phone
+      type: web
+      scenario_class: render
+      priority: P3
+      technique: compatibility
+      required: false
+      mutates: none
+      requirement_refs: [REQ-2]
+      role: visitor
+      preconditions:
+          ['Real iPhone (Safari) and Android phone (Chrome)', 'Cookies cleared']
+      steps:
+          - Open each of the four pages
+          - Read the consent box and tap Accept
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box readable,
+                expected: 'Both sentences and both buttons fit on screen without zooming; buttons are at least 44px tall',
+                provenance: standard,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: No sideways scroll,
+                expected: 'Pages cannot be dragged sideways',
+                provenance: REQ-2,
+            }
+      tags: [manual]
+      notes: 'Manual once before hand-in. Tap target size per WCAG 2.2 SC 2.5.8 (24px minimum; 44px is the house target).'
+
+    # ---------- box appears ----------
+    - id: CON-010
+      title: Consent box appears on the first visit to each public page
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: equivalence
+      required: true
+      mutates: none
+      requirement_refs: [REQ-3]
+      role: visitor
+      preconditions: [Fixture F1]
+      data: { routes: ['/', '/about', '/privacy', '/terms'] }
+      steps:
+          - Open the route in a fresh context
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Dialog shown,
+                expected: "A dialog named 'Cookie consent' is visible with buttons 'Accept' and 'Decline'",
+                provenance: REQ-3,
+            }
+      tags: [pest, e2e, smoke]
+      notes: 'Pest: Inertia prop showing the box is true when no cookie is sent. e2e: consent.spec.ts, one test per route.'
+
+    - id: CON-011
+      title: Consent box shows the required copy word for word
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-5]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: First sentence,
+                expected: "Dialog text contains 'Cookies are necessary for this website to function properly, for performance measurement, and to provide you with the best experience.'",
+                provenance: REQ-5,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Second sentence,
+                expected: "Dialog text contains 'By continuing to access or use this site, you acknowledge and consent to our use of cookies in accordance with our Terms & Conditions and Privacy Statement.'",
+                provenance: REQ-5,
+            }
+      tags: [e2e]
+      notes: 'consent.spec.ts. Whitespace is normalised before comparing. No negative or boundary case: fixed copy has no input classes; a wrong word fails A1 or A2.'
+
+    - id: CON-012
+      title: Box links go to the Terms and Privacy pages
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-6]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Activate the 'Terms & Conditions' link in the box
+          - Go back, then activate the 'Privacy Statement' link in the box
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Terms href,
+                expected: "Link 'Terms & Conditions' has href ending '/terms' and following it lands on URL path /terms",
+                provenance: REQ-6,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Privacy href,
+                expected: "Link 'Privacy Statement' has href ending '/privacy' and following it lands on URL path /privacy",
+                provenance: REQ-6,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Box still shown on target,
+                expected: "The 'Cookie consent' dialog is visible on /terms and /privacy, since no choice was made",
+                provenance: REQ-3,
+            }
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    # ---------- scroll lock and dismissal ----------
+    - id: CON-020
+      title: Page cannot scroll while the box is open
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-4]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /privacy
+          - Scroll down with the mouse wheel and press End and PageDown
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Not scrolled,
+                expected: 'window.scrollY is 0 after the scroll attempts',
+                provenance: REQ-4,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Overflow locked,
+                expected: "Computed overflow-y of html or body is 'hidden' or 'clip'",
+                provenance: REQ-4,
+            }
+      tags: [e2e]
+      notes: 'consent.spec.ts. /privacy is used because it is the longest page.'
+
+    - id: CON-021
+      title: Scrolling works again after Accept
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-4]
+      role: visitor
+      preconditions: [Fixture F1, 'Page content taller than the viewport']
+      steps:
+          - Open /privacy
+          - Click Accept
+          - Scroll down with the mouse wheel
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Scrolls,
+                expected: 'window.scrollY is greater than 0 after scrolling',
+                provenance: REQ-4,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Overflow released,
+                expected: "Computed overflow-y of body is not 'hidden'",
+                provenance: REQ-4,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-022
+      title: Escape and clicking outside do not close the box
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-21]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Press Escape
+          - Click the top-left corner of the page, outside the box
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Still open after Escape,
+                expected: "The 'Cookie consent' dialog is still visible",
+                provenance: REQ-21,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Still open after outside click,
+                expected: "The 'Cookie consent' dialog is still visible",
+                provenance: REQ-21,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: No cookie written,
+                expected: "Browser has neither a 'consent' nor a 'consent_declined' cookie",
+                provenance: REQ-21,
+            }
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    # ---------- accept ----------
+    - id: CON-030
+      title: Accept sets a readable consent cookie with GUID, time and version 1
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-7, REQ-15]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Accept
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box closes,
+                expected: "The 'Cookie consent' dialog is no longer visible",
+                provenance: REQ-7,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Cookie JSON,
+                expected: "Cookie 'consent' exists; its URL-decoded value parses as JSON with keys guid, accepted_at, version",
+                provenance: REQ-15,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: GUID,
+                expected: 'guid matches a UUID v4 (8-4-4-4-12 hex, version nibble 4)',
+                provenance: REQ-7,
+            }
+          - {
+                id: A4,
+                kind: state,
+                description: Time,
+                expected: "accepted_at is ISO 8601 in UTC (ends 'Z' or '+00:00') and within 30 s of the test's clock",
+                provenance: AS-2,
+            }
+          - {
+                id: A5,
+                kind: state,
+                description: Version,
+                expected: 'version equals 1',
+                provenance: REQ-7,
+            }
+      cleanup: 'none needed: fresh context per test; the consent row is harmless test data'
+      tags: [pest, e2e, smoke]
+      notes: "Pest: POST accept returns a Set-Cookie 'consent' with that JSON. e2e: consent.spec.ts reads the cookie from the browser."
+
+    - id: CON-031
+      title: Accept cookie expires one year after acceptance
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-8]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Accept
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Expiry,
+                expected: "Cookie 'consent' expires within 1 day of now + 365 days",
+                provenance: AS-3,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Not a session cookie,
+                expected: "Cookie 'consent' has an expiry date (expires is not -1)",
+                provenance: REQ-8,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [pest, e2e]
+      notes: 'Pest: Set-Cookie Max-Age/Expires equals 365 days from a frozen Carbon::now. e2e: consent.spec.ts.'
+
+    - id: CON-032
+      title: Accept stores the cookie's GUID, time and version in the consents table
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: data_integrity
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-9]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 10:00:00 UTC']
+      steps:
+          - POST the accept endpoint with no cookies
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: One row,
+                expected: 'consents has exactly 1 row',
+                provenance: REQ-9,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Row matches cookie,
+                expected: "Row guid equals the cookie guid, version = 1, accepted_at = 2026-11-08 10:00:00 UTC (same instant as the cookie's accepted_at)",
+                provenance: REQ-9,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Pest feature test. The end-to-end version of this (cookie GUID found in the admin table) is ADM-040.'
+
+    - id: CON-033
+      title: After Accept the box stays hidden on reload and on other pages
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-10]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Accept
+          - Reload the page
+          - Open /about
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Hidden on reload,
+                expected: "No 'Cookie consent' dialog after reload",
+                provenance: REQ-10,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Hidden on other page,
+                expected: "No 'Cookie consent' dialog on /about",
+                provenance: REQ-10,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Cookie unchanged,
+                expected: "After reload the 'consent' cookie still holds the same guid it had right after Accept",
+                provenance: REQ-10,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [pest, e2e]
+      notes: "Pest: request with a valid consent cookie gets the 'show box' prop false. e2e: consent.spec.ts."
+
+    - id: CON-034
+      title: Accepting twice with the same GUID keeps one database row
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: concurrency
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-18]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - POST the accept endpoint with no cookies and keep the returned consent cookie
+          - POST the accept endpoint again sending that cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Still one row,
+                expected: 'consents has exactly 1 row for that guid',
+                provenance: REQ-18,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Same GUID returned,
+                expected: "The second response's consent cookie carries the same guid",
+                provenance: REQ-18,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-035
+      title: Accept ignores a GUID, time or version sent by the client
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-7, REQ-15]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 10:00:00 UTC']
+      data:
+          {
+              body: "{guid: '00000000-0000-4000-8000-000000000000', accepted_at: '2000-01-01T00:00:00Z', version: 99}",
+          }
+      steps:
+          - POST the accept endpoint with the body above and no cookies
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Server-made GUID,
+                expected: 'The stored row and the cookie carry a guid other than 00000000-0000-4000-8000-000000000000',
+                provenance: REQ-7,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Server time and version,
+                expected: 'Stored accepted_at = 2026-11-08 10:00:00 UTC and version = 1',
+                provenance: REQ-7,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Guards against visitors forging acceptance records. Decline has no client input to forge, so REQ-12 has no matching negative.'
+
+    # ---------- accept cookie missing, expired, invalid, old version ----------
+    - id: CON-040
+      title: Clearing cookies after Accept brings the box back
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-11]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Accept
+          - Clear all cookies
+          - Reload the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box back,
+                expected: "The 'Cookie consent' dialog is visible again",
+                provenance: REQ-11,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-041
+      title: An expired consent cookie brings the box back
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: boundary
+      required: true
+      mutates: none
+      requirement_refs: [REQ-11]
+      role: visitor
+      preconditions: [Fixture F1]
+      data:
+          {
+              cookie: 'consent = valid JSON {guid: new UUID v4, accepted_at: 2025-01-01T00:00:00Z, version: 1}, expires 1 hour ago',
+          }
+      steps:
+          - Add the expired consent cookie to the browser
+          - Open /
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box shown,
+                expected: "The 'Cookie consent' dialog is visible",
+                provenance: REQ-11,
+            }
+      tags: [e2e]
+      notes: 'consent.spec.ts. The browser drops an expired cookie, so the server sees it as absent, which is what real expiry does.'
+
+    - id: CON-042
+      title: A tampered consent cookie brings the box back
+      type: hybrid
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-20]
+      role: visitor
+      preconditions: [Fixture F1]
+      data:
+          values:
+              [
+                  'not-json',
+                  '{"guid":"abc","accepted_at":"2026-11-08T00:00:00Z","version":1}',
+                  '{"version":1}',
+              ]
+      steps:
+          - Add a consent cookie with one of the values, expiring in 30 days
+          - Open /
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box shown,
+                expected: "The 'Cookie consent' dialog is visible for every value",
+                provenance: REQ-20,
+            }
+      tags: [pest, e2e]
+      notes: "Pest covers all three values against the 'show box' prop; e2e covers them in consent.spec.ts."
+
+    - id: CON-043
+      title: Raising CONSENT_VERSION re-prompts visitors who accepted an older version
+      type: api
+      scenario_class: ui_state
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: none
+      requirement_refs: [REQ-16]
+      role: visitor
+      preconditions: [Fixture F2, 'config consent.version set to 2']
+      data:
+          {
+              cookie: 'consent = {guid: new UUID v4, accepted_at: now, version: 1}',
+          }
+      steps:
+          - GET / with the version 1 consent cookie
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box shown,
+                expected: 'The Inertia prop that shows the consent box is true',
+                provenance: REQ-16,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Current version passes,
+                expected: 'The same request with a version 2 cookie gets the prop false',
+                provenance: REQ-16,
+            }
+      tags: [pest]
+      notes: 'Pest only: the e2e server cannot change config per test. consent.spec.ts has a lighter check that a version 0 cookie re-prompts.'
+
+    # ---------- decline ----------
+    - id: CON-050
+      title: Decline sets a consent_declined cookie with the decline time, expiring in one day
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-12, REQ-15]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Decline
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box closes,
+                expected: "The 'Cookie consent' dialog is no longer visible",
+                provenance: REQ-12,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Value,
+                expected: "Cookie 'consent_declined' exists; its URL-decoded value is an ISO 8601 UTC time within 30 s of now",
+                provenance: REQ-15,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Expiry,
+                expected: "Cookie 'consent_declined' expires within 1 day of now + 1 day (so between now and now + 2 days, never a session cookie)",
+                provenance: AS-3,
+            }
+          - {
+                id: A4,
+                kind: state,
+                description: No accept cookie,
+                expected: "No 'consent' cookie exists",
+                provenance: REQ-12,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [pest, e2e]
+      notes: 'e2e: consent.spec.ts. Pest: POST decline Set-Cookie with Max-Age 86400 from a frozen clock.'
+
+    - id: CON-051
+      title: Box stays hidden while the decline cookie is present
+      type: web
+      scenario_class: persistence
+      priority: P2
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-13]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Decline
+          - Reload the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Hidden,
+                expected: "No 'Cookie consent' dialog after reload",
+                provenance: REQ-13,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Cookie kept,
+                expected: "After reload the 'consent_declined' cookie still exists with the same value",
+                provenance: REQ-13,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-052
+      title: Box comes back once the decline cookie is gone
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-14]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Decline
+          - Clear all cookies
+          - Reload the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box back,
+                expected: "The 'Cookie consent' dialog is visible again",
+                provenance: REQ-14,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [pest, e2e]
+      notes: 'e2e: consent.spec.ts (cleared and expired variants). Pest: request with no cookies after a decline shows the box.'
+
+    - id: CON-053
+      title: Decline adds one anonymous row to consent_declines and none to consents
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: data_integrity
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-17]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 10:00:00 UTC']
+      steps:
+          - POST the decline endpoint with no cookies
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Decline counted,
+                expected: 'consent_declines has exactly 1 row with version = 1 and declined_at = 2026-11-08 10:00:00',
+                provenance: REQ-17,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Anonymous,
+                expected: 'consent_declines has only the columns id, version, declined_at',
+                provenance: REQ-17,
+            }
+          - {
+                id: A3,
+                kind: no_change,
+                description: No acceptance,
+                expected: 'consents has 0 rows',
+                provenance: REQ-12,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    # ---------- cookie settings ----------
+    - id: CON-060
+      title: Footer 'Cookie settings' reopens the box after a choice
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-19]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          - Open /
+          - Click Accept
+          - Click 'Cookie settings' in the footer
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Reopened,
+                expected: "The 'Cookie consent' dialog is visible with 'Accept' and 'Decline'",
+                provenance: REQ-19,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    # ---------- accessibility ----------
+    - id: CON-070
+      title: No serious or critical axe violations, box open and after accept, desktop and phone
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: accessibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-22]
+      role: visitor
+      preconditions: [Fixture F1]
+      data:
+          {
+              routes: ['/', '/about', '/privacy', '/terms'],
+              viewports: ['375x812', '1280x800'],
+          }
+      steps:
+          - Open each route at each viewport with the box open and run an axe scan (WCAG 2.0 to 2.2, A and AA)
+          - Click Accept and run the scan again
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box open,
+                expected: "0 violations with impact 'serious' or 'critical'",
+                provenance: standard,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: After accept,
+                expected: "0 violations with impact 'serious' or 'critical'",
+                provenance: standard,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Focus in box,
+                expected: "While the box is open, document.activeElement is inside the 'Cookie consent' dialog",
+                provenance: standard,
+            }
+      cleanup: 'none needed: fresh context per test'
+      tags: [e2e]
+      notes: 'a11y.spec.ts. Standard: WCAG 2.2 AA via axe-core; focus per SC 2.4.3.'
+
+    - id: CON-071
+      title: Consent cookie is readable in browser DevTools
+      type: web
+      scenario_class: render
+      priority: P3
+      technique: happy_path
+      required: false
+      mutates: test_data
+      requirement_refs: [REQ-15]
+      role: visitor
+      preconditions: ['Desktop Chrome, cookies cleared']
+      steps:
+          - Open / and click Accept
+          - Open DevTools > Application > Cookies
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Readable,
+                expected: "The 'consent' row shows JSON with guid, accepted_at and version (not an encrypted 'eyJpdiI6...' string) and Expires about a year ahead",
+                provenance: REQ-15,
+            }
+      cleanup: 'Clear site cookies'
+      tags: [manual]
+      notes: 'Manual walkthrough for the hand-in video; CON-030 proves the same value automatically.'

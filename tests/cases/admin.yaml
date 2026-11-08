@@ -1,0 +1,690 @@
+# case-spec/1 · admin portal
+#
+# Layer tags on every case say who proves it:
+#   pest   -> tests/Feature (PHP feature test, server side)
+#   e2e    -> tests/e2e (Playwright, real browser)
+#   manual -> a person, once before hand-in
+contract: case-spec/1
+title: Meridian · admin portal
+feature: A secured admin portal to view consent acceptances
+status: draft
+owner: Amirul
+
+sources:
+    - {
+          id: S1,
+          kind: other,
+          ref: 'Take-home brief (graded), bonus: secured admin portal with login to view consent acceptances',
+      }
+    - {
+          id: S2,
+          kind: chat,
+          ref: 'Design decisions agreed for this build (admin routes, registration off, rate limit, stats, table filters, CSV export)',
+      }
+    - {
+          id: S3,
+          kind: code,
+          ref: 'resources/js/pages/auth/login.tsx (field labels), config/fortify.php',
+      }
+
+requirements:
+    - id: REQ-1
+      text: Admin pages require login; a guest is sent to /login
+      anchor: 'S1 secured admin portal; S2 admin at /admin, login at /login'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-2
+      text: The seeded admin can log in at /login and lands on /admin
+      anchor: 'S1 login; S2 admin at /admin'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-3
+      text: Wrong credentials are rejected and no session is created
+      anchor: 'S1 secured'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-4
+      text: Registration is disabled; /register returns 404
+      anchor: 'S2 registration disabled'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-5
+      text: Login attempts are rate limited
+      anchor: 'S2 login rate limited'
+      risk: { impact: 3, likelihood: 1 }
+    - id: REQ-6
+      text: The admin overview shows consent stats and a 30-day chart
+      anchor: 'S2 overview with stats and 30-day chart'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-7
+      text: /admin/consents lists acceptances (GUID, version, accepted time) and can be searched by GUID
+      anchor: 'S1 view consent acceptances; S2 GUID search'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-8
+      text: The consents table filters by version
+      anchor: 'S2 version filter'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-9
+      text: The consents table filters by accepted date range
+      anchor: 'S2 date range'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-10
+      text: The consents table shows 25 rows per page
+      anchor: 'S2 pagination 25'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-11
+      text: /admin/consents/export downloads a CSV with header guid,version,accepted_at_utc that honours the active filters
+      anchor: 'S2 CSV export honouring filters'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-12
+      text: The consent box is not shown on admin pages or the login page
+      anchor: 'S2 consent box not on admin pages'
+      risk: { impact: 1, likelihood: 2 }
+    - id: REQ-13
+      text: An acceptance made on the public site appears in the admin table under the same GUID as the visitor's cookie
+      anchor: 'S1 accept stored in database + admin views acceptances'
+      risk: { impact: 3, likelihood: 2 }
+
+scope:
+    in:
+        - Login, logout-free access control for /admin, /admin/consents and the export
+        - Overview stats and chart
+        - Consents table search, filters, pagination and CSV export
+    out:
+        - {
+              item: 'Password reset, email verification, 2FA, passkeys',
+              reason: 'Starter kit features with their own tests in tests/Feature/Auth; not part of the brief',
+          }
+        - {
+              item: 'Multiple admin roles',
+              reason: 'Only one seeded admin and registration is off, so there is no second role to separate',
+          }
+        - {
+              item: 'Exact stat values against a large dataset',
+              reason: 'Totals are checked in Pest against a seeded count; load and performance are not in the brief',
+          }
+
+roles:
+    - { id: guest, auth_env: [] }
+    - { id: admin, auth_env: [E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD] }
+
+environments: [local, ci]
+
+fixtures:
+    - id: F1
+      text: 'Seeded admin user (DatabaseSeeder), email verified, no 2FA'
+      setup: 'php artisan migrate --seed'
+      cleanup: 'none needed: seed data'
+    - id: F2
+      text: 'Consents for Pest: 30 rows version 1 dated 2026-10-01..2026-10-30 and 5 rows version 2 dated 2026-11-01..2026-11-05, plus 4 consent_declines rows'
+      setup: 'Consent and ConsentDecline factories under RefreshDatabase'
+      cleanup: 'Rolled back by RefreshDatabase'
+    - id: F3
+      text: 'Two fresh acceptances made through the public site in separate browser contexts during the e2e test'
+      setup: 'Open / in a new context and click Accept, twice'
+      cleanup: 'none needed: CI database is thrown away; locally they are harmless test rows'
+
+assumptions:
+    - id: AS-1
+      text: "The overview shows stat labels containing 'Accept' and 'Declin', and the chart has an accessible name containing '30 days' (role img or figure)"
+      status: open
+    - id: AS-2
+      text: "The consents page has a GUID search box (searchbox role, or a field labelled or placeholdered 'Search' or 'GUID'), an 'Export' link or button, and a table"
+      status: open
+    - id: AS-3
+      text: "Rate limit follows Fortify's default: 5 attempts per minute per email and IP, then HTTP 429 or a 'Too many login attempts' error on the email field"
+      status: open
+    - id: AS-4
+      text: 'Filters travel in the query string so the export link can carry them (for example ?search=, ?version=, ?from=, ?to=)'
+      status: open
+
+cases:
+    # ---------- access ----------
+    - id: ADM-001
+      title: Guest opening /admin is redirected to /login
+      type: hybrid
+      scenario_class: authz_negative
+      priority: P1
+      technique: authz
+      required: true
+      mutates: none
+      requirement_refs: [REQ-1]
+      role: guest
+      preconditions: ['No session']
+      steps:
+          - Request /admin, /admin/consents and /admin/consents/export as a guest
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Redirected,
+                expected: 'Each responds 302 to /login (browser ends on URL path /login)',
+                provenance: REQ-1,
+            }
+          - {
+                id: A2,
+                kind: no_change,
+                description: No data leaked,
+                expected: "No response body contains a consent GUID or CSV header 'guid,version,accepted_at_utc'",
+                provenance: REQ-1,
+            }
+      tags: [pest, e2e, smoke]
+      notes: 'e2e: admin.spec.ts checks /admin. Pest checks all three routes.'
+
+    - id: ADM-002
+      title: Admin logs in and lands on /admin
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-2]
+      role: admin
+      preconditions: [Fixture F1]
+      steps:
+          - Open /login
+          - Fill 'Email address' and 'Password' with the admin credentials
+          - Click 'Log in'
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Landed,
+                expected: 'URL path is /admin',
+                provenance: REQ-2,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Session kept,
+                expected: 'Reloading /admin stays on /admin (not redirected to /login)',
+                provenance: REQ-2,
+            }
+      cleanup: 'none needed: session expires; fresh context per test'
+      tags: [pest, e2e, smoke]
+      notes: 'e2e: admin.spec.ts. Pest: existing AuthenticationTest adjusted to the /admin home.'
+
+    - id: ADM-003
+      title: Wrong password is rejected
+      type: hybrid
+      scenario_class: authz_negative
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-3, REQ-2]
+      role: guest
+      preconditions: [Fixture F1]
+      data: { email: 'admin@meridian.test', password: 'a wrong password' }
+      steps:
+          - POST /login with the data
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Rejected,
+                expected: "Redirect back with a validation error on email ('These credentials do not match our records.')",
+                provenance: existing_behavior,
+            }
+          - {
+                id: A2,
+                kind: no_change,
+                description: Still a guest,
+                expected: 'A follow-up GET /admin redirects to /login',
+                provenance: REQ-3,
+            }
+      tags: [pest]
+      notes: "Error copy is the starter kit's (existing_behavior)."
+
+    - id: ADM-004
+      title: Registration is off
+      type: api
+      scenario_class: authz_negative
+      priority: P1
+      technique: authz
+      required: true
+      mutates: none
+      requirement_refs: [REQ-4]
+      role: guest
+      preconditions: ['No session']
+      data:
+          {
+              post_body: "name 'Eve', email 'eve@example.test', plus a matching throwaway password and confirmation",
+          }
+      steps:
+          - GET /register
+          - POST /register with the body
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: GET 404,
+                expected: 'GET /register responds 404',
+                provenance: REQ-4,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: POST blocked,
+                expected: 'POST /register responds 404 or 405',
+                provenance: REQ-4,
+            }
+          - {
+                id: A3,
+                kind: no_change,
+                description: No user created,
+                expected: 'users has no row with email eve@example.test',
+                provenance: REQ-4,
+            }
+      tags: [pest, e2e]
+      notes: 'e2e covers GET; Pest covers both. The login page must not link to Sign up either (UI check in admin.spec.ts).'
+
+    - id: ADM-005
+      title: Sixth login attempt in a minute is throttled
+      type: api
+      scenario_class: authz_negative
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: none
+      requirement_refs: [REQ-5]
+      role: guest
+      preconditions: [Fixture F1]
+      data:
+          {
+              email: 'admin@meridian.test',
+              password: 'a wrong password',
+              attempts: 6,
+          }
+      steps:
+          - POST /login with the wrong password 5 times
+          - POST /login a 6th time with the correct password
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Throttled,
+                expected: "The 6th attempt responds 429 or returns an email error starting 'Too many login attempts'",
+                provenance: AS-3,
+            }
+          - {
+                id: A2,
+                kind: no_change,
+                description: Not logged in,
+                expected: 'GET /admin still redirects to /login',
+                provenance: REQ-5,
+            }
+      tags: [pest]
+      notes: 'Pest only: hammering login in e2e would lock out the shared admin session.'
+
+    # ---------- overview ----------
+    - id: ADM-010
+      title: Overview shows stats and the 30-day chart
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-6]
+      role: admin
+      preconditions: [Fixture F1, 'Logged in as admin']
+      steps:
+          - Open /admin
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Stats,
+                expected: "Text containing 'Accept' and text containing 'Declin' are visible",
+                provenance: AS-1,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Chart,
+                expected: "An element with role img or figure and an accessible name containing '30 days' is visible",
+                provenance: AS-1,
+            }
+      tags: [e2e]
+      notes: 'admin.spec.ts'
+
+    - id: ADM-011
+      title: Overview totals match the database
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: data_integrity
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-6]
+      role: admin
+      preconditions:
+          [
+              Fixture F2,
+              'Time frozen at 2026-11-08 12:00:00 UTC',
+              'Logged in as admin',
+          ]
+      steps:
+          - GET /admin
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Totals,
+                expected: 'Inertia props report 35 acceptances and 4 declines',
+                provenance: REQ-6,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Chart series,
+                expected: 'The chart series has 30 daily points ending 2026-11-08; days with no acceptances are 0, not missing',
+                provenance: REQ-6,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    # ---------- consents table ----------
+    - id: ADM-020
+      title: Consents table lists rows and GUID search narrows to one
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-7]
+      role: admin
+      preconditions: [Fixture F1, Fixture F3, 'Logged in as admin']
+      steps:
+          - Open /admin/consents
+          - Type the first F3 GUID in the search box and submit
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Table,
+                expected: "A table is visible with column headers containing 'GUID', 'Version' and 'Accepted'",
+                provenance: REQ-7,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Narrowed,
+                expected: 'After search the table has exactly 1 data row and it contains the searched GUID',
+                provenance: REQ-7,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Other row hidden,
+                expected: 'The second F3 GUID is not in the table',
+                provenance: REQ-7,
+            }
+      cleanup: 'none needed: see Fixture F3'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: search param filters the paginated prop.'
+
+    - id: ADM-024
+      title: Searching an unknown or malformed GUID returns no rows, not an error
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-7]
+      role: admin
+      preconditions: [Fixture F2, 'Logged in as admin']
+      data:
+          {
+              searches:
+                  ['11111111-1111-4111-8111-111111111111', '%', "' OR 1=1 --"],
+          }
+      steps:
+          - GET /admin/consents with each search value
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: No error,
+                expected: 'Each request responds 200',
+                provenance: REQ-7,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Empty,
+                expected: "Each request reports total 0 rows ('%' is matched literally, not as a wildcard)",
+                provenance: REQ-7,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: ADM-021
+      title: Version filter shows only that version
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-8]
+      role: admin
+      preconditions: [Fixture F2, 'Logged in as admin']
+      steps:
+          - GET /admin/consents filtered to version 2
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Filtered,
+                expected: 'Props report total 5 and every row has version 2',
+                provenance: REQ-8,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: ADM-022
+      title: Date range includes both end days
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-9]
+      role: admin
+      preconditions: [Fixture F2, 'Logged in as admin']
+      data: { from: '2026-10-10', to: '2026-10-12' }
+      steps:
+          - GET /admin/consents with the date range
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Inclusive,
+                expected: 'Props report total 3 (rows dated 10, 11 and 12 Oct, including one at 23:59:59 on the 12th)',
+                provenance: REQ-9,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Bad range,
+                expected: 'from later than to returns a validation error on the date fields or 0 rows, never a 500',
+                provenance: REQ-9,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Day boundaries are Malaysia days (Asia/Kuala_Lumpur, UTC+8), so a picked day matches the times shown on screen. The server converts the edges to UTC before querying.'
+
+    - id: ADM-023
+      title: Pagination shows 25 rows per page
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-10]
+      role: admin
+      preconditions: [Fixture F2, 'Logged in as admin']
+      steps:
+          - GET /admin/consents
+          - GET /admin/consents?page=2
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Page 1,
+                expected: '25 rows, newest accepted_at first',
+                provenance: REQ-10,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Page 2,
+                expected: '10 rows (35 total)',
+                provenance: REQ-10,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Newest-first order is an assumption carried in the build plan; if the app sorts differently, record it.'
+
+    - id: ADM-030
+      title: CSV export has the agreed header and honours the GUID filter
+      type: hybrid
+      scenario_class: flow
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-11]
+      role: admin
+      preconditions: [Fixture F1, Fixture F3, 'Logged in as admin']
+      steps:
+          - Open /admin/consents and search for the first F3 GUID
+          - Click Export and save the download
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Header,
+                expected: "First line of the file is exactly 'guid,version,accepted_at_utc'",
+                provenance: REQ-11,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Filtered,
+                expected: 'The file has exactly 1 data line and it starts with the searched GUID',
+                provenance: AS-4,
+            }
+      cleanup: 'none needed: download is a temp file'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: version and date filters on the export route, plus content-type text/csv.'
+
+    - id: ADM-031
+      title: Export with version filter only contains that version
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-11]
+      role: admin
+      preconditions: [Fixture F2, 'Logged in as admin']
+      steps:
+          - GET /admin/consents/export filtered to version 2
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: CSV,
+                expected: 'Status 200, Content-Type starts with text/csv, Content-Disposition is an attachment',
+                provenance: REQ-11,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Rows,
+                expected: 'Header plus 5 data lines, each with version 2 and an ISO 8601 UTC accepted_at_utc',
+                provenance: REQ-11,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: ADM-032
+      title: No consent box on login or admin pages
+      type: web
+      scenario_class: ui_state
+      priority: P3
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-12]
+      role: admin
+      preconditions: ['Fresh context with no consent cookies']
+      steps:
+          - Open /login
+          - Log in and open /admin and /admin/consents
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Not on login,
+                expected: "No 'Cookie consent' dialog on /login once the 'Log in' button is visible",
+                provenance: REQ-12,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Not on admin,
+                expected: "No 'Cookie consent' dialog on /admin or /admin/consents",
+                provenance: REQ-12,
+            }
+      tags: [e2e]
+      notes: 'admin.spec.ts'
+
+    # ---------- the proof ----------
+    - id: ADM-040
+      title: A visitor's acceptance shows up in the admin table under the cookie's GUID
+      type: hybrid
+      scenario_class: flow
+      priority: P1
+      technique: data_integrity
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-13]
+      role: admin
+      preconditions: [Fixture F1]
+      steps:
+          - In a fresh visitor context open / and click Accept
+          - Read the guid, accepted_at and version from the visitor's 'consent' cookie
+          - In a separate context log in as admin and open /admin/consents
+          - Search for the guid
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Row found,
+                expected: "The table has exactly 1 data row containing the cookie's guid",
+                provenance: REQ-13,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Version matches,
+                expected: "That row's version cell reads '1' or 'v1'",
+                provenance: REQ-13,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Time matches,
+                expected: "That row's accepted time carries a machine-readable datetime that is the same instant as the cookie's accepted_at (the visible text may be in Malaysia time)",
+                provenance: REQ-13,
+            }
+      evidence_extra: [video]
+      cleanup: 'none needed: see Fixture F3'
+      tags: [e2e, smoke]
+      notes: 'proof.spec.ts. The single test that ties cookie, database and admin view together.'
