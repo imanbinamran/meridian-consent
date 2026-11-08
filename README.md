@@ -2,7 +2,7 @@
 
 A four-page news site with a cookie consent gate and an admin portal to view the consents. Built with Laravel 13, Inertia, React, shadcn/ui and MySQL.
 
-**Live:** [TK: live URL] · **Admin:** [TK: live URL]/admin, `admin@meridian.test` / [TK: password shared separately]
+**Live:** https://meridian-production-gohs21.laravel.cloud · **Admin:** https://meridian-production-gohs21.laravel.cloud/admin, `admin@meridian.test` with the password I'm sharing separately. Hosted on Laravel Cloud in Singapore, with MySQL 8.4. The admin chart uses seeded demo data.
 
 | Brief                                                                          | Where it lives                                                                                 |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
