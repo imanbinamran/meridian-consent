@@ -18,4 +18,11 @@ return [
         'accepted' => 365,
         'declined' => 1,
     ],
+
+    /*
+    | Accept and decline requests allowed per minute from one IP address.
+    | The end-to-end suite posts far more than a real visitor would, so CI
+    | raises this through CONSENT_THROTTLE.
+    */
+    'throttle' => (int) env('CONSENT_THROTTLE', 30),
 ];

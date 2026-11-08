@@ -5,11 +5,12 @@ namespace App\Models;
 use Database\Factories\ConsentDeclineFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property int $version
- * @property \Illuminate\Support\Carbon $declined_at
+ * @property Carbon $declined_at
  */
 class ConsentDecline extends Model
 {

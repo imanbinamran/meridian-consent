@@ -3,11 +3,57 @@
 import * as React from "react"
 import { cn } from "cn"
 
+// Fade whichever inline edge has more columns hidden past it. The gradient
+// runs start to end, so it flips with the writing direction.
+const FADE_MASK =
+  "[--fade-end:0px] [--fade-start:0px] data-[overflow-end=true]:[--fade-end:2.5rem] data-[overflow-start=true]:[--fade-start:2.5rem] [mask-image:linear-gradient(to_right,transparent,#000_var(--fade-start),#000_calc(100%-var(--fade-end)),transparent)] rtl:[mask-image:linear-gradient(to_left,transparent,#000_var(--fade-start),#000_calc(100%-var(--fade-end)),transparent)]"
+
+/**
+ * Marks the container with data-overflow-start / data-overflow-end while
+ * content is cut off on that side. Writes attributes straight to the DOM so
+ * scrolling never re-renders the table.
+ */
+function useScrollEdges(ref: React.RefObject<HTMLDivElement | null>) {
+  React.useEffect(() => {
+    const el = ref.current
+
+    if (!el) {
+      return
+    }
+
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth
+      // scrollLeft runs negative in RTL, so compare distances, not signs.
+      const position = Math.abs(el.scrollLeft)
+
+      el.dataset.overflowStart = String(max > 1 && position > 1)
+      el.dataset.overflowEnd = String(max > 1 && position < max - 1)
+    }
+
+    update()
+    el.addEventListener("scroll", update, { passive: true })
+    const resize = new ResizeObserver(update)
+    resize.observe(el)
+    if (el.firstElementChild) {
+      resize.observe(el.firstElementChild)
+    }
+
+    return () => {
+      el.removeEventListener("scroll", update)
+      resize.disconnect()
+    }
+  }, [ref])
+}
+
 function Table({ className, ...props }: React.ComponentProps<"table">) {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  useScrollEdges(containerRef)
+
   return (
     <div
+      ref={containerRef}
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full overflow-x-auto", FADE_MASK)}
     >
       <table
         data-slot="table"

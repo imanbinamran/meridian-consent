@@ -5,12 +5,13 @@ namespace App\Models;
 use Database\Factories\ConsentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $guid
  * @property int $version
- * @property \Illuminate\Support\Carbon $accepted_at
+ * @property Carbon $accepted_at
  */
 class Consent extends Model
 {
