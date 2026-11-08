@@ -73,7 +73,7 @@ return [
     |
     */
 
-    'home' => '/dashboard',
+    'home' => '/admin',
 
     /*
     |--------------------------------------------------------------------------
@@ -161,7 +161,8 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Registration stays off: this is an admin portal, accounts are seeded.
+        // Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

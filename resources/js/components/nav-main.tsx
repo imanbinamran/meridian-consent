@@ -14,13 +14,16 @@ export function NavMain({ items }: { items: NavItem[] }) {
 
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarGroupLabel>Consent</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => (
                     <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
                             asChild
                             isActive={isCurrentUrl(item.href)}
+                            aria-current={
+                                isCurrentUrl(item.href) ? 'page' : undefined
+                            }
                             tooltip={{ children: item.title }}
                         >
                             <Link href={item.href} prefetch>

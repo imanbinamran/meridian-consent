@@ -38,6 +38,9 @@ export function NavFooter({
                                         <item.icon className="h-5 w-5" />
                                     )}
                                     <span>{item.title}</span>
+                                    <span className="sr-only">
+                                        (opens in a new tab)
+                                    </span>
                                 </a>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

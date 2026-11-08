@@ -1,5 +1,9 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import {
+    footerNavItems as rightNavItems,
+    mainNavItems,
+} from '@/components/admin/nav-items';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -33,32 +37,11 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import type { BreadcrumbItem, NavItem } from '@/types';
+import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
 };
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-
-const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
 
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
@@ -80,7 +63,8 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
+                                    className="me-2 h-[34px] w-[34px]"
+                                    aria-label="Open navigation menu"
                                 >
                                     <Menu className="h-5 w-5" />
                                 </Button>
@@ -92,7 +76,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <SheetTitle className="sr-only">
                                     Navigation menu
                                 </SheetTitle>
-                                <SheetHeader className="flex justify-start text-left">
+                                <SheetHeader className="flex justify-start text-start">
                                     <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
@@ -102,7 +86,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                                 <Link
                                                     key={item.title}
                                                     href={item.href}
-                                                    className="flex items-center space-x-2 font-medium"
+                                                    className="flex items-center gap-2 font-medium"
                                                 >
                                                     {item.icon && (
                                                         <item.icon className="h-5 w-5" />
@@ -119,7 +103,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                                     href={toUrl(item.href)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center space-x-2 font-medium"
+                                                    className="flex items-center gap-2 font-medium"
                                                 >
                                                     {item.icon && (
                                                         <item.icon className="h-5 w-5" />
@@ -137,15 +121,15 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     <Link
                         href={dashboard()}
                         prefetch
-                        className="flex items-center space-x-2"
+                        className="flex items-center gap-2"
                     >
                         <AppLogo />
                     </Link>
 
                     {/* Desktop Navigation */}
-                    <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
+                    <div className="ms-6 hidden h-full items-center gap-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
-                            <NavigationMenuList className="flex h-full items-stretch space-x-2">
+                            <NavigationMenuList className="flex h-full items-stretch gap-2">
                                 {mainNavItems.map((item, index) => (
                                     <NavigationMenuItem
                                         key={index}
@@ -163,12 +147,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             )}
                                         >
                                             {item.icon && (
-                                                <item.icon className="mr-2 h-4 w-4" />
+                                                <item.icon className="me-2 h-4 w-4" />
                                             )}
                                             {item.title}
                                         </Link>
                                         {isCurrentUrl(item.href) && (
-                                            <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
+                                            <div className="absolute start-0 bottom-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
                                         )}
                                     </NavigationMenuItem>
                                 ))}
@@ -176,16 +160,9 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                         </NavigationMenu>
                     </div>
 
-                    <div className="ml-auto flex items-center space-x-2">
-                        <div className="relative flex items-center space-x-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="group h-9 w-9 cursor-pointer"
-                            >
-                                <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                            </Button>
-                            <div className="ml-1 hidden gap-1 lg:flex">
+                    <div className="ms-auto flex items-center gap-2">
+                        <div className="relative flex items-center gap-1">
+                            <div className="ms-1 hidden gap-1 lg:flex">
                                 {rightNavItems.map((item) => (
                                     <Tooltip key={item.title}>
                                         <TooltipTrigger>

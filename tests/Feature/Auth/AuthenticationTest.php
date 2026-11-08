@@ -89,4 +89,23 @@ class AuthenticationTest extends TestCase
 
         $response->assertTooManyRequests();
     }
+
+    public function test_login_is_locked_after_five_failed_attempts()
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 5) as $attempt) {
+            $this->post(route('login.store'), [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertSessionHasErrors('email');
+        }
+
+        $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertTooManyRequests();
+
+        $this->assertGuest();
+    }
 }
