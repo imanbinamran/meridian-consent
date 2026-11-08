@@ -1,8 +1,21 @@
+@php
+    // Decided on the server so scrolling is locked from the first paint,
+    // before React loads. The consent dialog removes the class on a choice.
+    $consentRequired = (bool) data_get($page, 'props.consent.required', false);
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark', 'consent-locked' => $consentRequired])>
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+
+        {{-- Browser chrome matches the header: one colour per theme, or the saved choice. --}}
+        @if (($appearance ?? 'system') === 'system')
+            <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+            <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0a09">
+        @else
+            <meta name="theme-color" content="{{ $appearance === 'dark' ? '#0c0a09' : '#ffffff' }}">
+        @endif
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
@@ -28,6 +41,12 @@
             html.dark {
                 background-color: oklch(0.145 0 0);
             }
+
+            html.consent-locked,
+            html.consent-locked body {
+                overflow: hidden;
+                overscroll-behavior: none;
+            }
         </style>
 
         <link rel="icon" href="/favicon.ico" sizes="any">
@@ -36,10 +55,13 @@
 
         @fonts
 
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link rel="stylesheet" href="https://fonts.bunny.net/css?family=newsreader:400,500,600,400i,500i&display=swap">
+
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>
-            <title>{{ config('app.name', 'Laravel') }}</title>
+            <title>Meridian</title>
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">

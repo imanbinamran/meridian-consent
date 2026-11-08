@@ -2,11 +2,13 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,7 +17,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        // The consent cookies are left readable on purpose: they hold no secret,
+        // and a visitor (or a reviewer in DevTools) can see exactly what we keep.
+        $middleware->encryptCookies(except: [
+            'appearance',
+            'sidebar_state',
+            'consent',
+            'consent_declined',
+        ]);
 
         $middleware->web(append: [
             HandleAppearance::class,
@@ -27,4 +36,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
-    })->create();
+    })
+    ->booted(function (): void {
+        // Read per request, so CONSENT_THROTTLE can differ per environment.
+        RateLimiter::for('consent', fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('consent.throttle')),
+        )->by($request->ip()));
+    })
+    ->create();
