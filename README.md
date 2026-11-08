@@ -20,7 +20,7 @@ A four-page news site with a cookie consent gate and an admin portal to view the
 You need PHP 8.3+, Composer, Node 24 with pnpm, and MySQL 8 (MariaDB 10.11 works too).
 
 ```bash
-git clone [TK: repo URL] meridian && cd meridian
+git clone https://github.com/imanbinamran/meridian-consent.git meridian && cd meridian
 mysql -u root -e "CREATE DATABASE meridian"
 composer setup      # installs packages, writes .env, migrates, builds the frontend
 php artisan db:seed # the admin account plus 30 days of demo consents
