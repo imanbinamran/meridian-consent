@@ -10,6 +10,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { store } from '@/routes/contact';
@@ -302,14 +309,20 @@ export default function About() {
                                 </a>
                             </ContactRow>
                             <ContactRow icon={<Mail />} label="Write">
-                                <EmailLink address="newsroom@meridian.example" />{' '}
-                                for general enquiries
-                                <br />
-                                <EmailLink address="tips@meridian.example" />{' '}
-                                for news tips
-                                <br />
-                                <EmailLink address="corrections@meridian.example" />{' '}
-                                for corrections
+                                <span className="grid gap-x-4 sm:grid-cols-[auto_1fr]">
+                                    <span className="text-muted-foreground">
+                                        General
+                                    </span>
+                                    <EmailLink address="newsroom@meridian.example" />
+                                    <span className="mt-2 text-muted-foreground sm:mt-0">
+                                        News tips
+                                    </span>
+                                    <EmailLink address="tips@meridian.example" />
+                                    <span className="mt-2 text-muted-foreground sm:mt-0">
+                                        Corrections
+                                    </span>
+                                    <EmailLink address="corrections@meridian.example" />
+                                </span>
                             </ContactRow>
                             <ContactRow icon={<Clock />} label="Hours">
                                 Office: Monday to Friday, 9am to 6pm
@@ -429,23 +442,31 @@ function ContactForm() {
 
                         <div className="grid gap-2 sm:col-span-2">
                             <Label htmlFor="contact-topic">Topic</Label>
-                            <select
-                                id="contact-topic"
+                            <Select
                                 name="topic"
                                 required
                                 defaultValue="general"
-                                aria-invalid={errors.topic ? true : undefined}
-                                className="h-9 w-full rounded-4xl border border-input bg-input/30 px-3 text-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 aria-invalid:border-destructive"
                             >
-                                {topics.map((topic) => (
-                                    <option
-                                        key={topic.value}
-                                        value={topic.value}
-                                    >
-                                        {topic.label}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger
+                                    id="contact-topic"
+                                    className="w-full"
+                                    aria-invalid={
+                                        errors.topic ? true : undefined
+                                    }
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent position="popper">
+                                    {topics.map((topic) => (
+                                        <SelectItem
+                                            key={topic.value}
+                                            value={topic.value}
+                                        >
+                                            {topic.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <InputError message={errors.topic} />
                         </div>
 

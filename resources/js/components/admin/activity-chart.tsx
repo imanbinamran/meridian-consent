@@ -45,7 +45,7 @@ export function ActivityChart({ data }: Props) {
     const declined = data.reduce((sum, point) => sum + point.declined, 0);
 
     return (
-        <Card className="gap-4">
+        <Card className="h-full gap-4">
             <CardHeader>
                 <CardTitle>Daily responses</CardTitle>
                 <CardDescription className="max-w-prose tabular-nums">
