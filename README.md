@@ -128,7 +128,7 @@ You don't need any of this to mark the brief. It's here so you can tell what was
 - HttpOnly on both cookies
 - five readable sample stories at `/stories/{slug}`, behind the same consent gate ([STR-001](tests/cases/stories.yaml#L165) to [STR-022](tests/cases/stories.yaml#L683))
 - an English and Bahasa Melayu switch on the public site and in the consent box, remembered in a cookie ([LNG-001](tests/cases/language.yaml#L99) to [LNG-031](tests/cases/language.yaml#L281))
-- a live admin overview over free Pusher or Laravel Reverb, off until it's switched on ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
+- a live admin overview over free Pusher or Laravel Reverb, on for the live site and off by default for a fresh install ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
 
 The admin overview, with seeded demo data:
 
