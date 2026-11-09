@@ -73,12 +73,20 @@ export type FakeReverb = {
     drop: () => Promise<void>;
     allowReconnect: () => void;
     closed: () => boolean;
+    /** Send an error on the open socket, as the service would. */
+    sendError: () => void;
 };
+
+const SERVICE_ERROR = JSON.stringify({
+    event: 'pusher:error',
+    data: { code: null, message: 'Invalid signature' },
+});
 
 /** Speak just enough of the Pusher protocol for the page to go live. */
 export async function fakeReverb(
     page: Page,
     socketUrl: RegExp = /:6001\/app\//,
+    { refuseChannel = false }: { refuseChannel?: boolean } = {},
 ): Promise<FakeReverb> {
     let socket: WebSocketRoute | undefined;
     let refusing = false;
@@ -102,7 +110,9 @@ export async function fakeReverb(
         ws.onMessage((raw) => {
             const message = JSON.parse(String(raw));
 
-            if (message.event === 'pusher:subscribe') {
+            if (message.event === 'pusher:subscribe' && refuseChannel) {
+                ws.send(SERVICE_ERROR);
+            } else if (message.event === 'pusher:subscribe') {
                 ws.send(
                     JSON.stringify({
                         event: 'pusher_internal:subscription_succeeded',
@@ -140,6 +150,7 @@ export async function fakeReverb(
             refusing = false;
         },
         closed: () => closed,
+        sendError: () => socket?.send(SERVICE_ERROR),
     };
 }
 

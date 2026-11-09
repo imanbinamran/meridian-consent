@@ -74,13 +74,6 @@ export default function Overview({
                             <Badge variant="secondary" className="tabular-nums">
                                 v{stats.currentVersion}
                             </Badge>
-                            <span className="text-xs text-muted-foreground tabular-nums">
-                                {pluralize(stats.acceptedCurrentVersion, {
-                                    one: 'acceptance',
-                                    other: 'acceptances',
-                                })}{' '}
-                                on this version
-                            </span>
                             <LiveIndicator status={liveStatus} />
                         </>
                     }

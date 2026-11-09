@@ -181,6 +181,37 @@ test.describe('with a fake socket', () => {
         expect(errors).toEqual([]);
     });
 
+    test('ADM-072 shows Disconnected when the service refuses the channel', async ({
+        page,
+    }) => {
+        const errors = collectPageErrors(page);
+        await setRealtime(page, REALTIME);
+        await fakeReverb(page, undefined, { refuseChannel: true });
+
+        await page.goto('/admin');
+
+        await expect(indicator(page)).toHaveText(/^Disconnected/);
+        await expect(
+            page.getByRole('heading', { name: 'Total accepted' }),
+        ).toBeVisible();
+        expect(errors).toEqual([]);
+    });
+
+    test('ADM-072 stays Live when the service reports an error after subscribing', async ({
+        page,
+    }) => {
+        await setRealtime(page, REALTIME);
+        const reverb = await fakeReverb(page);
+
+        await page.goto('/admin');
+        await expect(indicator(page)).toHaveText(/^Live/);
+
+        reverb.sendError();
+        await page.waitForTimeout(500);
+
+        await expect(indicator(page)).toHaveText(/^Live/);
+    });
+
     test('ADM-059 leaving the page closes the socket', async ({ page }) => {
         await setRealtime(page, REALTIME);
         const reverb = await fakeReverb(page);
