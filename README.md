@@ -131,6 +131,14 @@ If your MySQL user isn't `root` with no password, set `DB_USERNAME` and `DB_PASS
 
 Log in at http://localhost:8000/login with `admin@meridian.test` / `password`.
 
+### Live overview
+
+The admin overview updates by itself when someone accepts, declines or withdraws. A green **Live** badge next to the title says it's on. If the connection drops the badge reads **Disconnected**, and the numbers stay until it comes back. It reconnects by itself and catches up.
+
+It's off by default, so the app runs without it. To turn it on, set `BROADCAST_CONNECTION=reverb` in `.env` and start the app with `composer dev`. That also starts Reverb and a queue worker. The Reverb values in `.env.example` work on your own machine. If something else is on port 8080, set `REVERB_PORT` and `REVERB_SERVER_PORT` to a free one.
+
+The stats, chart and recent list are live. The browser and device breakdowns refresh on page load.
+
 ## How the consent works
 
 How the parts connect:
@@ -237,14 +245,15 @@ The table badge, the record page, the status filter and the CSV all use the same
 - **Times are stored in UTC and shown in Malaysia time.** The admin's date filters and chart use Kuala Lumpur days, so picking 12 Oct means 12 Oct as the admin sees it.
 - **The admin can't be signed up for.** Registration is turned off. Login is rate limited to 5 tries a minute, and 2FA and passkeys are available in settings.
 - **Accept and decline are rate limited** at 30 a minute per IP (`CONSENT_THROTTLE`).
+- **Live updates can't hurt a visitor.** Saving a choice only adds a job to the queue. A worker talks to Reverb, so an accept never waits on a socket server that's down, and a failure to queue is logged and ignored. The message says only "something changed". It carries no GUID, IP or device data, and the page then asks for the new numbers behind the admin login. A double click, a retry or a repeat decline changes nothing, so it sends nothing.
 - **Ready for right-to-left.** Layouts use logical properties, so a Jawi or Arabic edition would mirror correctly. I tested it with `dir="rtl"`.
 
 ## Tests
 
 Last full run on 9 Nov 2026: every test below passed.
 
-- **Pest:** 239 tests (1,797 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
-- **Playwright:** 95 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
+- **Pest:** 265 tests (1,887 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
+- **Playwright:** 104 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
 - **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
 
@@ -254,6 +263,8 @@ pnpm exec playwright install chromium             # once
 pnpm test:e2e                                     # Playwright (starts the app itself)
 ```
 
+The live overview tests use a fake socket, so neither CI nor your machine needs Reverb. One test uses a real server across two browsers. It's skipped unless you start the app with Reverb on and set `E2E_REVERB=1`.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Where things are
@@ -262,6 +273,8 @@ pnpm test:e2e                                     # Playwright (starts the app i
 app/Support/Consent/        checking cookies against the database, withdrawals, device parsing
 app/Http/Middleware/        shares the consent state with every public page
 app/Http/Controllers/       consent accept and decline, admin overview, table and record page
+app/Events/                 the "consents changed" broadcast
+routes/channels.php         who may listen to it
 resources/js/pages/site/    the four public pages
 resources/js/pages/admin/   admin overview, consents table and record page
 config/consent.php          version, cookie names, lifetimes, rate limit
