@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ConsentIndexRequest;
 use App\Models\Consent;
+use App\Models\ConsentEvent;
 use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Inertia\Inertia;
@@ -49,6 +50,32 @@ class ConsentController extends Controller
                 ->sortDesc()
                 ->values()),
             'currentVersion' => $currentVersion,
+        ]);
+    }
+
+    /**
+     * One record and its audit trail. The events are only read here, never
+     * for the table. It takes the table's filters so "back" returns to the
+     * same view.
+     */
+    public function show(ConsentIndexRequest $request, Consent $consent): Response
+    {
+        return Inertia::render('admin/consents/show', [
+            'timezone' => config('admin.timezone'),
+            'backUrl' => route('admin.consents.index', array_filter($request->validated(), fn ($value) => $value !== null), absolute: false),
+            'consent' => [
+                'guid' => $consent->guid,
+                'version' => $consent->version,
+                'isCurrent' => $consent->version === (int) config('consent.version'),
+                'status' => $this->status($consent),
+                ...$this->device($consent),
+                'events' => $consent->events->map(fn (ConsentEvent $event) => [
+                    'id' => $event->id,
+                    'type' => $event->type,
+                    'version' => $event->version,
+                    'occurredAt' => $event->occurred_at->toIso8601ZuluString(),
+                ]),
+            ],
         ]);
     }
 

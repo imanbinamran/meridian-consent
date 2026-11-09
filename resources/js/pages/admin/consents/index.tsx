@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { dashboard } from '@/routes';
-import { exportMethod, index } from '@/routes/admin/consents';
+import { exportMethod, index, show } from '@/routes/admin/consents';
 
 type Props = {
     timezone: string;
@@ -97,7 +97,7 @@ export default function ConsentsIndex({
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Consents"
-                    description={`Every recorded acceptance. Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
+                    description={`Every recorded acceptance. Open a GUID to see its history. Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
                     actions={
                         <Button variant="outline" asChild>
                             <a
@@ -148,6 +148,14 @@ export default function ConsentsIndex({
                             timeZone={timezone}
                             direction={filters.direction}
                             onSort={(direction) => update({ direction })}
+                            recordUrl={(guid) =>
+                                show.url(guid, {
+                                    query: toQuery(
+                                        filters,
+                                        consents.current_page,
+                                    ),
+                                })
+                            }
                             busy={busy}
                         />
                     ) : filtering ? (

@@ -18,4 +18,5 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
 
     Route::get('consents', [ConsentController::class, 'index'])->name('admin.consents.index');
     Route::get('consents/export', [ConsentController::class, 'export'])->name('admin.consents.export');
+    Route::get('consents/{consent:guid}', [ConsentController::class, 'show'])->whereUuid('consent')->name('admin.consents.show');
 });

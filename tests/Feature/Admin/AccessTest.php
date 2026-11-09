@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Consent;
 use App\Models\User;
 
 dataset('admin routes', [
@@ -23,6 +24,12 @@ test('verified admins can open every admin page', function (string $route) {
         ->get(route($route))
         ->assertOk();
 })->with('admin routes');
+
+test('verified admins can open a record', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('admin.consents.show', Consent::factory()->create()->guid))
+        ->assertOk();
+});
 
 test('the overview lives at /admin', function () {
     expect(route('dashboard', absolute: false))->toBe('/admin')

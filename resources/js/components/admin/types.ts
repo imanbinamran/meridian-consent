@@ -17,6 +17,21 @@ export type ConsentRow = ConsentDevice & {
     recordedAt: string | null;
 };
 
+export type ConsentEvent = {
+    id: number;
+    type: string;
+    version: number;
+    occurredAt: string;
+};
+
+export type ConsentRecord = ConsentDevice & {
+    guid: string;
+    version: number;
+    isCurrent: boolean;
+    status: ConsentStatus;
+    events: ConsentEvent[];
+};
+
 export type RecentConsent = {
     id: number;
     guid: string;
