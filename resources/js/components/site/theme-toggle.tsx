@@ -29,9 +29,9 @@ export function ThemeToggle({ className }: { className?: string }) {
     return (
         <button
             type="button"
-            onClick={() => {
+            onClick={(event) => {
                 const next = isDark ? 'light' : 'dark';
-                updateAppearance(next);
+                updateAppearance(next, event.currentTarget);
                 syncThemeColor(next);
             }}
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}

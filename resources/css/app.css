@@ -284,6 +284,44 @@
     }
 }
 
+/*
+| Theme switch: the new colours grow out of the icon as a circle. The old page
+| holds still underneath, and the live page stays clickable during the reveal.
+| Colour transitions are off so the new snapshot starts in its final colours.
+*/
+@keyframes theme-reveal {
+    from {
+        clip-path: circle(0 at var(--theme-reveal-x) var(--theme-reveal-y));
+    }
+
+    to {
+        clip-path: circle(
+            var(--theme-reveal-radius) at var(--theme-reveal-x)
+                var(--theme-reveal-y)
+        );
+    }
+}
+
+html.theme-reveal {
+    & *,
+    & *::before,
+    & *::after {
+        transition: none !important;
+    }
+
+    &::view-transition {
+        pointer-events: none;
+    }
+
+    &::view-transition-old(root) {
+        animation: none;
+    }
+
+    &::view-transition-new(root) {
+        animation: theme-reveal 600ms var(--ease-in-out-strong) both;
+    }
+}
+
 @layer components {
     /* Long-form legal copy (Privacy, Terms). */
     .legal-prose {

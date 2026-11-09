@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 
 export type ResolvedAppearance = 'light' | 'dark';
 export type Appearance = ResolvedAppearance | 'system';
@@ -6,7 +7,7 @@ export type Appearance = ResolvedAppearance | 'system';
 export type UseAppearanceReturn = {
     readonly appearance: Appearance;
     readonly resolvedAppearance: ResolvedAppearance;
-    readonly updateAppearance: (mode: Appearance) => void;
+    readonly updateAppearance: (mode: Appearance, origin?: Element) => void;
 };
 
 const listeners = new Set<() => void>();
@@ -70,6 +71,60 @@ const mediaQuery = (): MediaQueryList | null => {
 
 const handleSystemThemeChange = (): void => applyTheme(currentAppearance);
 
+const commitTheme = (mode: Appearance): void => {
+    applyTheme(mode);
+    notify();
+};
+
+let latestReveal: ViewTransition | null = null;
+
+/**
+ * Switch the theme with the new colours growing out of `origin` as a circle.
+ * Browsers without view transitions, and visitors who ask for reduced motion,
+ * get the same switch without the animation.
+ */
+const revealTheme = (mode: Appearance, origin: Element): void => {
+    const root = document.documentElement;
+    const changesColours = isDarkMode(mode) !== root.classList.contains('dark');
+
+    if (
+        !changesColours ||
+        !document.startViewTransition ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+        commitTheme(mode);
+
+        return;
+    }
+
+    const { left, top, width, height } = origin.getBoundingClientRect();
+    const x = left + width / 2;
+    const y = top + height / 2;
+    const radius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y),
+    );
+
+    root.style.setProperty('--theme-reveal-x', `${x}px`);
+    root.style.setProperty('--theme-reveal-y', `${y}px`);
+    root.style.setProperty('--theme-reveal-radius', `${radius}px`);
+    root.classList.add('theme-reveal');
+
+    // React must commit inside the callback so the new icon is in the snapshot.
+    const reveal = document.startViewTransition(() => {
+        flushSync(() => commitTheme(mode));
+    });
+
+    latestReveal = reveal;
+
+    // A second switch mid-reveal skips this one, so only the last one cleans up.
+    void reveal.finished.finally(() => {
+        if (latestReveal === reveal) {
+            root.classList.remove('theme-reveal');
+        }
+    });
+};
+
 export function initializeTheme(): void {
     if (typeof window === 'undefined') {
         return;
@@ -98,7 +153,7 @@ export function useAppearance(): UseAppearanceReturn {
         ? 'dark'
         : 'light';
 
-    const updateAppearance = (mode: Appearance): void => {
+    const updateAppearance = (mode: Appearance, origin?: Element): void => {
         currentAppearance = mode;
 
         // Store in localStorage for client-side persistence...
@@ -107,8 +162,13 @@ export function useAppearance(): UseAppearanceReturn {
         // Store in cookie for SSR...
         setCookie('appearance', mode);
 
-        applyTheme(mode);
-        notify();
+        if (origin) {
+            revealTheme(mode, origin);
+
+            return;
+        }
+
+        commitTheme(mode);
     };
 
     return { appearance, resolvedAppearance, updateAppearance } as const;
