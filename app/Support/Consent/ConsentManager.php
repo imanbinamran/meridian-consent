@@ -190,14 +190,24 @@ final class ConsentManager
 
     /**
      * Mark the cookie's record withdrawn and add the withdrawn event, together
-     * or not at all. Returns false when the cookie matches no live record.
+     * or not at all. Returns true when the GUID is a consent already dealt
+     * with here, so the caller adds no anonymous decline for it, and false
+     * when the cookie matches no record.
      */
     private function withdraw(AcceptedConsent $cookie, CarbonImmutable $at): bool
     {
         return DB::transaction(function () use ($cookie, $at): bool {
-            $record = $this->matchingRecord($cookie, lock: true);
+            $record = Consent::query()->where('guid', $cookie->guid)->lockForUpdate()->first();
 
             if ($record === null) {
+                return false;
+            }
+
+            if ($record->isWithdrawn()) {
+                return true;
+            }
+
+            if (! $this->agrees($record, $cookie)) {
                 return false;
             }
 
@@ -222,21 +232,20 @@ final class ConsentManager
      * The live row this cookie claims to be, or null if there is none, it was
      * withdrawn, or it disagrees on the time (to the second) or the version.
      */
-    private function matchingRecord(AcceptedConsent $cookie, bool $lock = false): ?Consent
+    private function matchingRecord(AcceptedConsent $cookie): ?Consent
     {
         $record = Consent::query()
             ->where('guid', $cookie->guid)
             ->whereNull('withdrawn_at')
-            ->when($lock, fn ($query) => $query->lockForUpdate())
             ->first();
 
-        if ($record === null
-            || $record->version !== $cookie->version
-            || $record->accepted_at->getTimestamp() !== $cookie->acceptedAt->getTimestamp()) {
-            return null;
-        }
+        return $record !== null && $this->agrees($record, $cookie) ? $record : null;
+    }
 
-        return $record;
+    private function agrees(Consent $record, AcceptedConsent $cookie): bool
+    {
+        return $record->version === $cookie->version
+            && $record->accepted_at->getTimestamp() === $cookie->acceptedAt->getTimestamp();
     }
 
     private function declinedAt(Request $request, CarbonImmutable $now): ?CarbonImmutable

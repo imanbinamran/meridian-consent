@@ -107,7 +107,8 @@ it('does not withdraw twice when a withdrawn cookie is replayed on decline', fun
     $this->withUnencryptedCookie('consent', $value)->post(route('consent.decline'));
 
     expect(ConsentEvent::query()->where('type', 'withdrawn')->count())->toBe(1)
-        ->and(Consent::sole()->withdrawn_at->toIso8601ZuluString())->toBe($withdrawnAt);
+        ->and(Consent::sole()->withdrawn_at->toIso8601ZuluString())->toBe($withdrawnAt)
+        ->and(ConsentDecline::count())->toBe(0);
 });
 
 // CON-084
