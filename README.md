@@ -45,6 +45,15 @@
 
 ## Review it in 5 minutes
 
+> [!IMPORTANT]
+> **Admin sign-in**
+>
+> - **Portal:** [meridian-production-gohs21.laravel.cloud/admin](https://meridian-production-gohs21.laravel.cloud/admin)
+> - **Email:** `admin@meridian.test`
+> - **Password:** `123456`
+>
+> On [a local copy](#run-it-locally), the password is `password`.
+
 All 8 requirements, the bonus admin portal and the deliverables are in this repo. Extras are marked, so you can skip them.
 
 Use a private window on the [live site](https://meridian-production-gohs21.laravel.cloud). Cookies are in DevTools, under Application, then Cookies.
@@ -58,7 +67,7 @@ Use a private window on the [live site](https://meridian-production-gohs21.larav
 | 5   | Delete `consent_declined` and reload.                                                                          | The box comes back.                                                                                                        | 8     |
 | 6   | Open the [admin portal](https://meridian-production-gohs21.laravel.cloud/admin), sign in, and search the GUID. | One matching row, Active.                                                                                                  | Bonus |
 
-Sign in with `admin@meridian.test` and the password I sent with this submission. It's hosted on Laravel Cloud in Singapore, with MySQL 8.4. The same route works on [a local copy](#run-it-locally), where the password is `password`.
+The site is hosted on Laravel Cloud in Singapore, with MySQL 8.4. The same route works on a local copy.
 
 The same route, recorded. Every frame is a Playwright capture of a local run.
 
