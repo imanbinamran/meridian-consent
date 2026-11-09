@@ -15,18 +15,29 @@ import {
 } from '@/components/ui/sheet';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
+import {
+    DEFAULT_SORT,
+    SORT_OPTIONS,
+    sortLabel,
+    sortOption,
+} from './consent-sort';
 import { DAY, dateRangeLabel, toDate } from './date-range-picker';
 import type {
     ConsentFilters as Filters,
     ConsentStatus,
+    SortColumn,
     SortDirection,
 } from './types';
 
-type Scope = 'all' | 'version' | 'status' | 'dates';
-type Draft = Pick<Filters, 'version' | 'status' | 'from' | 'to' | 'direction'>;
+type Scope = 'all' | 'sort' | 'version' | 'status' | 'dates';
+type Draft = Pick<
+    Filters,
+    'version' | 'status' | 'from' | 'to' | 'sort' | 'direction'
+>;
 
 const TITLES: Record<Scope, string> = {
     all: 'Filters',
+    sort: 'Sort',
     version: 'Version',
     status: 'Status',
     dates: 'Date range',
@@ -43,13 +54,15 @@ const STATUS_OPTIONS: { value: ConsentStatus; label: string }[] = [
     { value: 'withdrawn', label: 'Withdrawn' },
 ];
 
-const SORT_OPTIONS: { value: SortDirection; label: string }[] = [
-    { value: 'desc', label: 'Newest first' },
-    { value: 'asc', label: 'Oldest first' },
-];
-
-function toDraft({ version, status, from, to, direction }: Filters): Draft {
-    return { version, status, from, to, direction };
+function toDraft({
+    version,
+    status,
+    from,
+    to,
+    sort,
+    direction,
+}: Filters): Draft {
+    return { version, status, from, to, sort, direction };
 }
 
 type Props = {
@@ -59,7 +72,7 @@ type Props = {
     onChange: (changes: Partial<Filters>) => void;
 };
 
-/** Version, status and date filters as chips, for narrow screens. */
+/** Sort, version, status and date controls as chips, for narrow screens. */
 export function ConsentFilterStrip({
     filters,
     versions,
@@ -103,7 +116,23 @@ export function ConsentFilterStrip({
     const showVersion = scope === 'all' || scope === 'version';
     const showStatus = scope === 'all' || scope === 'status';
     const showDates = scope === 'all' || scope === 'dates';
-    const showFooter = scope === 'all' || scope === 'dates';
+    const showSort = scope === 'all' || scope === 'sort';
+    const showFooter = scope === 'all' || scope === 'sort' || scope === 'dates';
+    const sortedByDefault =
+        filters.sort === DEFAULT_SORT && filters.direction === 'desc';
+    const draftOption = sortOption(draft.sort);
+
+    const reset = () =>
+        setDraft(
+            scope === 'sort'
+                ? { ...draft, sort: DEFAULT_SORT, direction: 'desc' }
+                : {
+                      sort: draft.sort,
+                      direction: draft.direction,
+                      version: scope === 'all' ? undefined : draft.version,
+                      status: scope === 'all' ? undefined : draft.status,
+                  },
+        );
 
     const range: DateRange | undefined = toDate(draft.from)
         ? { from: toDate(draft.from), to: toDate(draft.to) }
@@ -133,6 +162,12 @@ export function ConsentFilterStrip({
             </Button>
 
             <div className="-mx-1 -my-1 flex min-w-0 flex-1 [scrollbar-width:none] gap-2 overflow-x-auto px-1 py-1 [&::-webkit-scrollbar]:hidden">
+                <Chip
+                    label="Sort"
+                    value={sortLabel(filters.sort, filters.direction)}
+                    quiet={sortedByDefault}
+                    onClick={(button) => show('sort', button)}
+                />
                 <Chip
                     label="Version"
                     value={filters.version ? `v${filters.version}` : undefined}
@@ -174,7 +209,9 @@ export function ConsentFilterStrip({
                     <SheetHeader className="p-4 pe-14">
                         <SheetTitle>{TITLES[scope]}</SheetTitle>
                         <SheetDescription className="sr-only">
-                            Choose which consents to show.
+                            {scope === 'sort'
+                                ? 'Choose the order consents are listed in.'
+                                : 'Choose which consents to show.'}
                         </SheetDescription>
                     </SheetHeader>
 
@@ -231,19 +268,46 @@ export function ConsentFilterStrip({
                             </Section>
                         )}
 
-                        {scope === 'all' && (
-                            <Section title="Accepted at" titled>
-                                <Options
-                                    label="Sort by accepted at"
-                                    value={draft.direction}
-                                    options={SORT_OPTIONS}
-                                    onSelect={(value) =>
-                                        choose({
-                                            direction: value as SortDirection,
-                                        })
-                                    }
-                                />
-                            </Section>
+                        {showSort && (
+                            <>
+                                <Section title="Sort by" titled>
+                                    <Options
+                                        label="Sort by"
+                                        value={draft.sort}
+                                        options={SORT_OPTIONS}
+                                        onSelect={(value) =>
+                                            choose({
+                                                sort: value as SortColumn,
+                                                direction: sortOption(
+                                                    value as SortColumn,
+                                                ).first,
+                                            })
+                                        }
+                                    />
+                                </Section>
+                                <Section title="Order" titled>
+                                    <Options
+                                        label="Order"
+                                        value={draft.direction}
+                                        options={[
+                                            {
+                                                value: 'desc',
+                                                label: draftOption.desc,
+                                            },
+                                            {
+                                                value: 'asc',
+                                                label: draftOption.asc,
+                                            },
+                                        ]}
+                                        onSelect={(value) =>
+                                            choose({
+                                                direction:
+                                                    value as SortDirection,
+                                            })
+                                        }
+                                    />
+                                </Section>
+                            </>
                         )}
 
                         {showDates && (
@@ -285,19 +349,7 @@ export function ConsentFilterStrip({
                                 type="button"
                                 variant="ghost"
                                 className="h-11 flex-1"
-                                onClick={() =>
-                                    setDraft({
-                                        direction: draft.direction,
-                                        version:
-                                            scope === 'all'
-                                                ? undefined
-                                                : draft.version,
-                                        status:
-                                            scope === 'all'
-                                                ? undefined
-                                                : draft.status,
-                                    })
-                                }
+                                onClick={reset}
                             >
                                 Reset
                             </Button>
@@ -319,10 +371,13 @@ export function ConsentFilterStrip({
 function Chip({
     label,
     value,
+    quiet = false,
     onClick,
 }: {
     label: string;
     value?: string;
+    /** Shows the value without marking it as something the admin changed. */
+    quiet?: boolean;
     onClick: (button: HTMLButtonElement) => void;
 }) {
     return (
@@ -334,7 +389,7 @@ function Chip({
             className={cn(
                 TAP_AREA,
                 'font-normal tabular-nums',
-                value
+                value && !quiet
                     ? 'border-foreground/30 bg-muted'
                     : 'text-muted-foreground',
             )}

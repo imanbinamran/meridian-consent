@@ -69,12 +69,21 @@ export type OverviewStats = {
 
 export type SortDirection = 'asc' | 'desc';
 
+export type SortColumn =
+    | 'accepted_at'
+    | 'recorded_at'
+    | 'guid'
+    | 'version'
+    | 'status'
+    | 'device';
+
 export type ConsentFilters = {
     search?: string;
     version?: number;
     status?: ConsentStatus;
     from?: string;
     to?: string;
+    sort: SortColumn;
     direction: SortDirection;
 };
 

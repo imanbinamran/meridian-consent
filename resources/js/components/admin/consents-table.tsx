@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
     Table,
@@ -10,18 +10,20 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { sortOption } from './consent-sort';
 import { CopyButton } from './copy-button';
 import { formatDevice, formatRecent, formatUtc } from './format';
 import { LocalTime } from './local-time';
 import { PRESSABLE } from './motion';
 import { StatusBadge } from './status-badge';
-import type { ConsentRow, SortDirection } from './types';
+import type { ConsentRow, SortColumn, SortDirection } from './types';
 
 type Props = {
     rows: ConsentRow[];
     timeZone: string;
+    sort: SortColumn;
     direction: SortDirection;
-    onSort: (direction: SortDirection) => void;
+    onSort: (sort: SortColumn, direction: SortDirection) => void;
     /** Where each row's GUID links to. */
     recordUrl: (guid: string) => string;
     /** True once a reload has taken longer than a blink. */
@@ -31,46 +33,28 @@ type Props = {
 export function ConsentsTable({
     rows,
     timeZone,
+    sort,
     direction,
     onSort,
     recordUrl,
     busy = false,
 }: Props) {
-    const SortIcon = direction === 'desc' ? ArrowDown : ArrowUp;
+    const sorting = { sort, direction, onSort };
 
     return (
         <Table className="min-w-[56rem]" aria-busy={busy}>
             <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                    <TableHead className="ps-4">GUID</TableHead>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Device</TableHead>
-                    <TableHead
-                        aria-sort={
-                            direction === 'desc' ? 'descending' : 'ascending'
-                        }
-                    >
-                        <button
-                            type="button"
-                            onClick={() =>
-                                onSort(direction === 'desc' ? 'asc' : 'desc')
-                            }
-                            className={cn(
-                                '-ms-2 inline-flex items-center gap-1 rounded-md px-2 py-1 whitespace-nowrap hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                PRESSABLE,
-                            )}
-                        >
-                            Accepted at
-                            <SortIcon className="size-3.5" aria-hidden />
-                            <span className="sr-only">
-                                {direction === 'desc'
-                                    ? ', newest first. Sort oldest first'
-                                    : ', oldest first. Sort newest first'}
-                            </span>
-                        </button>
-                    </TableHead>
-                    <TableHead className="pe-4">Recorded</TableHead>
+                    <SortableHead column="guid" className="ps-4" {...sorting} />
+                    <SortableHead column="version" {...sorting} />
+                    <SortableHead column="status" {...sorting} />
+                    <SortableHead column="device" {...sorting} />
+                    <SortableHead column="accepted_at" {...sorting} />
+                    <SortableHead
+                        column="recorded_at"
+                        className="pe-4"
+                        {...sorting}
+                    />
                 </TableRow>
             </TableHeader>
             {/* Dim, don't swap for a skeleton: the rows keep their place, and a
@@ -145,5 +129,52 @@ export function ConsentsTable({
                 ))}
             </TableBody>
         </Table>
+    );
+}
+
+function SortableHead({
+    column,
+    sort,
+    direction,
+    onSort,
+    className,
+}: {
+    column: SortColumn;
+    sort: SortColumn;
+    direction: SortDirection;
+    onSort: (sort: SortColumn, direction: SortDirection) => void;
+    className?: string;
+}) {
+    const option = sortOption(column);
+    const active = column === sort;
+    const opposite = direction === 'desc' ? 'asc' : 'desc';
+    const next = active ? opposite : option.first;
+    const Icon = !active
+        ? ArrowUpDown
+        : direction === 'desc'
+          ? ArrowDown
+          : ArrowUp;
+    const ariaSort = direction === 'desc' ? 'descending' : 'ascending';
+
+    return (
+        <TableHead
+            className={className}
+            aria-sort={active ? ariaSort : undefined}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(column, next)}
+                className={cn(
+                    '-ms-2 inline-flex items-center gap-1 rounded-md px-2 py-1 whitespace-nowrap hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                    PRESSABLE,
+                )}
+            >
+                {option.label}
+                <Icon
+                    className={cn('size-3.5', !active && 'opacity-40')}
+                    aria-hidden
+                />
+            </button>
+        </TableHead>
     );
 }

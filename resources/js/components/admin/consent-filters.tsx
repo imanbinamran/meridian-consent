@@ -79,7 +79,7 @@ export function ConsentFilters({
         >
             <div className="grid min-w-0 flex-[1_1_18rem] gap-1.5">
                 <Label htmlFor="consent-search" className="sr-only">
-                    Search by GUID
+                    Search by GUID or device
                 </Label>
                 <div className="relative">
                     <Search
@@ -92,7 +92,7 @@ export function ConsentFilters({
                         inputMode="search"
                         autoComplete="off"
                         spellCheck={false}
-                        placeholder="Search by GUID, e.g. 3f2a9c"
+                        placeholder="Search GUID or device, e.g. desktop"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         maxLength={100}

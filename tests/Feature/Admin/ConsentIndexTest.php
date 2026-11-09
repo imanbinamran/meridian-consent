@@ -21,7 +21,7 @@ test('it lists consents 25 to a page, newest first', function () {
             ->where('consents.total', 30)
             ->where('consents.per_page', 25)
             ->where('consents.last_page', 2)
-            ->where('filters', ['direction' => 'desc'])
+            ->where('filters', ['sort' => 'accepted_at', 'direction' => 'desc'])
             ->has('consents.data.0', fn (Assert $row) => $row
                 ->hasAll(['id', 'guid', 'version', 'isCurrent', 'status', 'deviceType', 'browserFamily', 'osFamily', 'acceptedAt', 'recordedAt'])),
         );
@@ -118,7 +118,7 @@ test('a blank search is the same as no search', function () {
     $this->get(route('admin.consents.index', ['search' => '   ']))
         ->assertInertia(fn (Assert $page) => $page
             ->where('consents.total', 2)
-            ->where('filters', ['direction' => 'desc']));
+            ->where('filters', ['sort' => 'accepted_at', 'direction' => 'desc']));
 });
 
 test('the empty table still renders', function () {
@@ -224,3 +224,89 @@ test('ADM-047 the table never reads events and its queries do not grow with the 
     expect(count($many))->toBe(count($one))
         ->and(implode(' ', $many))->not->toContain('consent_events');
 });
+
+function sortedGuids(array $query): array
+{
+    return collect(test()->get(route('admin.consents.index', $query))->assertOk()->viewData('page')['props']['consents']['data'])
+        ->pluck('guid')
+        ->all();
+}
+
+test('ADM-068 every column sorts both ways', function (string $sort, array $first, array $second) {
+    $a = Consent::factory()->create(['guid' => 'aaaa0000-0000-4000-8000-000000000001', ...$first]);
+    $b = Consent::factory()->create(['guid' => 'bbbb0000-0000-4000-8000-000000000002', ...$second]);
+
+    expect(sortedGuids(['sort' => $sort, 'direction' => 'asc']))->toBe([$a->guid, $b->guid])
+        ->and(sortedGuids(['sort' => $sort, 'direction' => 'desc']))->toBe([$b->guid, $a->guid]);
+})->with([
+    'accepted at' => ['accepted_at', ['accepted_at' => '2026-11-01 00:00:00'], ['accepted_at' => '2026-11-02 00:00:00']],
+    'recorded' => ['recorded_at', ['created_at' => '2026-11-01 00:00:00'], ['created_at' => '2026-11-02 00:00:00']],
+    'guid' => ['guid', [], []],
+    'version' => ['version', ['version' => 1], ['version' => 2]],
+    'status' => ['status', ['accepted_at' => '2026-11-07 00:00:00'], ['accepted_at' => '2026-11-07 00:00:00', 'withdrawn_at' => '2026-11-07 01:00:00']],
+    'device type' => ['device', ['device_type' => 'Desktop'], ['device_type' => 'Mobile']],
+    'then browser' => ['device', ['device_type' => 'Mobile', 'browser_family' => 'Chrome'], ['device_type' => 'Mobile', 'browser_family' => 'Safari']],
+    'then os' => ['device', ['device_type' => 'Mobile', 'browser_family' => 'Chrome', 'os_family' => 'Android'], ['device_type' => 'Mobile', 'browser_family' => 'Chrome', 'os_family' => 'iOS']],
+]);
+
+test('ADM-068 status sorts by what the row shows, including expired', function () {
+    config(['consent.version' => 2]);
+    $active = Consent::factory()->create(['version' => 2, 'accepted_at' => '2026-11-07 00:00:00']);
+    $oldNotice = Consent::factory()->create(['version' => 1, 'accepted_at' => '2026-11-06 00:00:00']);
+    $withdrawn = Consent::factory()->withdrawn()->create(['version' => 2, 'accepted_at' => '2026-11-05 00:00:00']);
+
+    expect(sortedGuids(['sort' => 'status', 'direction' => 'asc']))->toBe([$active->guid, $oldNotice->guid, $withdrawn->guid]);
+});
+
+test('ADM-068 a row with no device details sorts as Unknown', function () {
+    $legacy = Consent::factory()->create(['device_type' => null, 'browser_family' => null, 'os_family' => null]);
+    $tablet = Consent::factory()->create(['device_type' => 'Tablet']);
+
+    expect(sortedGuids(['sort' => 'device', 'direction' => 'asc']))->toBe([$tablet->guid, $legacy->guid]);
+});
+
+test('ADM-068 the sort stays on every page link, and rows that tie never repeat', function () {
+    Consent::factory()->count(30)->create(['version' => 1]);
+
+    $this->get(route('admin.consents.index', ['sort' => 'version']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.sort', 'version')
+            ->where('consents.next_page_url', fn (string $url) => str_contains($url, 'sort=version')));
+
+    $pages = [...sortedGuids(['sort' => 'version']), ...sortedGuids(['sort' => 'version', 'page' => 2])];
+
+    expect($pages)->toHaveCount(30)->and(array_unique($pages))->toHaveCount(30);
+});
+
+test('ADM-068 an unknown sort column is a validation error', function () {
+    $this->get(route('admin.consents.index', ['sort' => 'guid; drop table consents']))
+        ->assertRedirect(route('admin.consents.index'))
+        ->assertSessionHasErrors('sort');
+});
+
+test('ADM-069 search finds rows by device, browser or operating system', function (string $search, array $expected) {
+    Consent::factory()->create(['guid' => 'aaaa0000-0000-4000-8000-000000000001', 'device_type' => 'Desktop', 'browser_family' => 'Chrome', 'os_family' => 'Windows']);
+    Consent::factory()->create(['guid' => 'bbbb0000-0000-4000-8000-000000000002', 'device_type' => 'Desktop', 'browser_family' => 'Safari', 'os_family' => 'macOS']);
+    Consent::factory()->create(['guid' => 'cccc0000-0000-4000-8000-000000000003', 'device_type' => 'Mobile', 'browser_family' => 'Chrome', 'os_family' => 'Android']);
+    Consent::factory()->create(['guid' => 'dddd0000-0000-4000-8000-000000000004', 'device_type' => null, 'browser_family' => null, 'os_family' => null]);
+
+    expect(sortedGuids(['search' => $search, 'sort' => 'guid', 'direction' => 'asc']))
+        ->toBe(array_map(fn (string $prefix) => match ($prefix) {
+            'a' => 'aaaa0000-0000-4000-8000-000000000001',
+            'b' => 'bbbb0000-0000-4000-8000-000000000002',
+            'c' => 'cccc0000-0000-4000-8000-000000000003',
+            'd' => 'dddd0000-0000-4000-8000-000000000004',
+        }, $expected));
+})->with([
+    'device type' => ['desktop', ['a', 'b']],
+    'any case' => ['MOBILE', ['c']],
+    'start of a word' => ['desk', ['a', 'b']],
+    'browser' => ['chrome', ['a', 'c']],
+    'operating system' => ['macos', ['b']],
+    'two words narrow' => ['desktop chrome', ['a']],
+    'as the table shows it' => ['Desktop · Chrome on Windows', ['a']],
+    'never recorded' => ['unknown', ['d']],
+    'middle of a device word finds nothing' => ['esktop', []],
+    'a word that matches nothing' => ['desktop nokia', []],
+    'guid still matches' => ['bbbb0000', ['b']],
+]);
