@@ -144,6 +144,7 @@ export function ConsentFilters({
                     <SelectContent>
                         <SelectItem value="all">All statuses</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
                         <SelectItem value="withdrawn">Withdrawn</SelectItem>
                     </SelectContent>
                 </Select>

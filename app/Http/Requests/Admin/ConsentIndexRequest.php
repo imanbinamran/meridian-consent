@@ -16,10 +16,6 @@ class ConsentIndexRequest extends FormRequest
 {
     public const DIRECTIONS = ['desc', 'asc'];
 
-    public const STATUS_ACTIVE = 'active';
-
-    public const STATUS_WITHDRAWN = 'withdrawn';
-
     public function authorize(): bool
     {
         return true;
@@ -35,7 +31,7 @@ class ConsentIndexRequest extends FormRequest
             // GUID simply finds nothing; it is not an error.
             'search' => ['nullable', 'string', 'max:100'],
             'version' => ['nullable', 'integer', 'min:1'],
-            'status' => ['nullable', Rule::in([self::STATUS_ACTIVE, self::STATUS_WITHDRAWN])],
+            'status' => ['nullable', Rule::in(Consent::STATUSES)],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'direction' => ['nullable', Rule::in(self::DIRECTIONS)],
@@ -95,9 +91,7 @@ class ConsentIndexRequest extends FormRequest
                 $query->whereLike('guid', '%'.addcslashes($search, '%_\\').'%');
             })
             ->when($filters['version'] ?? null, fn (Builder $query, int $version) => $query->where('version', $version))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $status === self::STATUS_WITHDRAWN
-                ? $query->whereNotNull('withdrawn_at')
-                : $query->whereNull('withdrawn_at'))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->whereStatus($status))
             // Dates are local days. Convert each edge to UTC for the query.
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->where(
                 'accepted_at', '>=', CarbonImmutable::parse($from, $timezone)->startOfDay()->utc(),

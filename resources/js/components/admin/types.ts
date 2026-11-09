@@ -1,4 +1,4 @@
-export type ConsentStatus = 'active' | 'withdrawn';
+export type ConsentStatus = 'active' | 'expired' | 'withdrawn';
 
 /** Coarse device details. Never null: a missing value arrives as "Unknown". */
 export type ConsentDevice = {

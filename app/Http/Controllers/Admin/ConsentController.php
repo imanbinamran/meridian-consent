@@ -37,7 +37,7 @@ class ConsentController extends Controller
                     'guid' => $consent->guid,
                     'version' => $consent->version,
                     'isCurrent' => $consent->version === $currentVersion,
-                    'status' => $this->status($consent),
+                    'status' => $consent->status(),
                     ...$this->device($consent),
                     'acceptedAt' => $consent->accepted_at->toIso8601ZuluString(),
                     'recordedAt' => $consent->created_at?->toIso8601ZuluString(),
@@ -67,7 +67,7 @@ class ConsentController extends Controller
                 'guid' => $consent->guid,
                 'version' => $consent->version,
                 'isCurrent' => $consent->version === (int) config('consent.version'),
-                'status' => $this->status($consent),
+                'status' => $consent->status(),
                 ...$this->device($consent),
                 'events' => $consent->events->map(fn (ConsentEvent $event) => [
                     'id' => $event->id,
@@ -102,7 +102,7 @@ class ConsentController extends Controller
                     $consent->guid,
                     $consent->version,
                     $consent->accepted_at->toIso8601ZuluString(),
-                    $this->status($consent),
+                    $consent->status(),
                     $consent->withdrawn_at?->toIso8601ZuluString(),
                     ...array_values($this->device($consent)),
                 ], escape: '');
@@ -113,11 +113,6 @@ class ConsentController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Cache-Control' => 'no-store',
         ]);
-    }
-
-    private function status(Consent $consent): string
-    {
-        return $consent->isWithdrawn() ? ConsentIndexRequest::STATUS_WITHDRAWN : ConsentIndexRequest::STATUS_ACTIVE;
     }
 
     /**

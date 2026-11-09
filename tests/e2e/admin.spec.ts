@@ -11,7 +11,11 @@ import {
     logInAsAdmin,
     searchGuid,
 } from './support/admin';
-import { consentDialog, settleAnimations } from './support/consent';
+import {
+    EXPIRED_CONSENT,
+    consentDialog,
+    settleAnimations,
+} from './support/consent';
 
 const CSV_HEADER =
     'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family';
@@ -321,6 +325,33 @@ test.describe('as the admin', () => {
         );
     });
 
+    test('ADM-054 a consent past its lifetime reads Expired in the table, filter, record and CSV', async ({
+        page,
+    }) => {
+        const { guid } = EXPIRED_CONSENT;
+
+        await page.goto('/admin/consents');
+        await chooseStatus(page, 'Expired');
+        await expect(page).toHaveURL(/status=expired/);
+        await searchGuid(page, guid);
+
+        const row = dataRows(consentsTable(page)).first();
+        await expect(row).toContainText(guid);
+        await expect(row).toContainText('Expired');
+
+        const response = await page.request.get(
+            `/admin/consents/export?status=expired&search=${guid}`,
+        );
+        expect((await response.text()).trim().split(/\r?\n/)[1]).toBe(
+            `${guid},1,${EXPIRED_CONSENT.accepted_at},expired,,Desktop,Chrome,Windows`,
+        );
+
+        await page.goto(`/admin/consents/${guid}`);
+        await expect(
+            page.locator('dt', { hasText: /^Status$/ }).locator('+ dd'),
+        ).toHaveText('Expired');
+    });
+
     test('ADM-049 the overview shows withdrawals and labelled device breakdowns', async ({
         page,
     }) => {
@@ -374,6 +405,8 @@ test.describe('as the admin', () => {
                     '/admin',
                     '/admin/consents',
                     `/admin/consents/${guid}`,
+                    '/admin/consents?status=expired',
+                    `/admin/consents/${EXPIRED_CONSENT.guid}`,
                 ]) {
                     await page.goto(path);
                     await expect(

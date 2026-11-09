@@ -25,7 +25,8 @@ class DatabaseSeeder extends Seeder
         );
 
         if (app()->environment('local', 'testing') || config('admin.demo_data')) {
-            $this->call(ConsentDemoSeeder::class);
+            // In this order: the demo data is skipped once any consent exists.
+            $this->call([ConsentDemoSeeder::class, ExpiredConsentSeeder::class]);
         }
     }
 }
