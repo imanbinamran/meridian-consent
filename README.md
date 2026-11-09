@@ -21,8 +21,8 @@
   <img alt="Inertia 3" src="https://img.shields.io/badge/Inertia-3-9553E9?logo=inertia&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="MySQL 8.4" src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white">
-  <img alt="Pest: 304 tests" src="https://img.shields.io/badge/Pest-304%20tests-F28D1A">
-  <img alt="Playwright: 152 tests" src="https://img.shields.io/badge/Playwright-152%20tests-2EAD33">
+  <img alt="Pest: 358 tests" src="https://img.shields.io/badge/Pest-358%20tests-F28D1A">
+  <img alt="Playwright: 199 tests" src="https://img.shields.io/badge/Playwright-199%20tests-2EAD33">
 </p>
 
 <p align="center">
@@ -83,14 +83,14 @@ Numbers match the PDF. Every case ID links to its write-up in [`tests/cases/`](t
 
 | #           | The brief asks for                                                             | How to check it                                                                                                                                                                       | Code                                                                                                                          | Proved by                                                                                                                                                                                                                                                                               |
 | ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1           | 4 pages                                                                        | Open `/`, `/about`, `/privacy` and `/terms`.                                                                                                                                          | [`routes/web.php`](routes/web.php#L14), [`pages/site/`](resources/js/pages/site)                                              | [CON-001](tests/cases/consent.yaml#L221)                                                                                                                                                                                                                                                |
+| 1           | 4 pages                                                                        | Open `/`, `/about`, `/privacy` and `/terms`.                                                                                                                                          | [`routes/web.php`](routes/web.php#L15), [`pages/site/`](resources/js/pages/site)                                              | [CON-001](tests/cases/consent.yaml#L221)                                                                                                                                                                                                                                                |
 | 2           | Mobile friendly                                                                | Narrow the window. Nothing scrolls sideways, and the box becomes a bottom sheet. Checked from 320px up, light and dark, and right to left.                                            | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                               | [CON-002](tests/cases/consent.yaml#L253), [CON-003](tests/cases/consent.yaml#L287)                                                                                                                                                                                                      |
-| 3           | Consent box on first visit, page can't scroll                                  | Open any page in a private window. The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                                           | [`app.blade.php`](resources/views/app.blade.php#L45), [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L49)      | [CON-010](tests/cases/consent.yaml#L347), [CON-020](tests/cases/consent.yaml#L444), [CON-022](tests/cases/consent.yaml#L510)                                                                                                                                                            |
-| 4           | The exact consent copy                                                         | Compare the box with the PDF, word for word.                                                                                                                                          | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                               | [CON-011](tests/cases/consent.yaml#L372)                                                                                                                                                                                                                                                |
+| 3           | Consent box on first visit, page can't scroll                                  | Open any page in a private window. The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                                           | [`app.blade.php`](resources/views/app.blade.php#L45), [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L50)      | [CON-010](tests/cases/consent.yaml#L347), [CON-020](tests/cases/consent.yaml#L444), [CON-022](tests/cases/consent.yaml#L510)                                                                                                                                                            |
+| 4           | The exact consent copy                                                         | Compare the box with the PDF, word for word. English is the default.                                                                                                                  | [`lang/en/site.php`](lang/en/site.php#L65)                                                                                    | [CON-011](tests/cases/consent.yaml#L372)                                                                                                                                                                                                                                                |
 | 5           | Links to Terms and Privacy                                                     | Click both links in the box.                                                                                                                                                          | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                               | [CON-012](tests/cases/consent.yaml#L403)                                                                                                                                                                                                                                                |
-| 6           | Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | Click Accept and read the `consent` cookie. Find its GUID in the admin.                                                                                                               | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L69), [`schema.sql`](database/schema.sql)                       | [CON-030](tests/cases/consent.yaml#L551), [CON-031](tests/cases/consent.yaml#L605), [CON-032](tests/cases/consent.yaml#L638)                                                                                                                                                            |
-| 7           | Box stays away until the cookie expires or is gone                             | Reload and change page. Then delete the cookie and reload. It's checked on the server on every page, and against the database.                                                        | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L170)                                                           | [CON-033](tests/cases/consent.yaml#L670), [CON-040](tests/cases/consent.yaml#L781), [CON-041](tests/cases/consent.yaml#L809), [CON-072](tests/cases/consent.yaml#L1158)                                                                                                                 |
-| 8           | Decline: cookie with the time, lasts 1 day, box returns                        | Click Decline and read `consent_declined`. Delete it and reload.                                                                                                                      | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L107)                                                           | [CON-050](tests/cases/consent.yaml#L911), [CON-051](tests/cases/consent.yaml#L958), [CON-052](tests/cases/consent.yaml#L992)                                                                                                                                                            |
+| 6           | Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | Click Accept and read the `consent` cookie. Find its GUID in the admin.                                                                                                               | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L70), [`schema.sql`](database/schema.sql)                       | [CON-030](tests/cases/consent.yaml#L551), [CON-031](tests/cases/consent.yaml#L605), [CON-032](tests/cases/consent.yaml#L638)                                                                                                                                                            |
+| 7           | Box stays away until the cookie expires or is gone                             | Reload and change page. Then delete the cookie and reload. It's checked on the server on every page, and against the database.                                                        | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L172)                                                           | [CON-033](tests/cases/consent.yaml#L670), [CON-040](tests/cases/consent.yaml#L781), [CON-041](tests/cases/consent.yaml#L809), [CON-072](tests/cases/consent.yaml#L1158)                                                                                                                 |
+| 8           | Decline: cookie with the time, lasts 1 day, box returns                        | Click Decline and read `consent_declined`. Delete it and reload.                                                                                                                      | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L109)                                                           | [CON-050](tests/cases/consent.yaml#L911), [CON-051](tests/cases/consent.yaml#L958), [CON-052](tests/cases/consent.yaml#L992)                                                                                                                                                            |
 | Bonus       | Secured admin portal                                                           | `/admin`: overview, 30-day chart, consent health, accept rate, renewals due, device, browser and OS breakdowns, searchable table with a status filter, a page per record, CSV export. | [`Admin/ConsentController.php`](app/Http/Controllers/Admin/ConsentController.php), [`pages/admin/`](resources/js/pages/admin) | [ADM-002](tests/cases/admin.yaml#L272), [ADM-020](tests/cases/admin.yaml#L488), [ADM-030](tests/cases/admin.yaml#L654), [ADM-040](tests/cases/admin.yaml#L751), [ADM-043](tests/cases/admin.yaml#L865), [ADM-045](tests/cases/admin.yaml#L946), [ADM-049](tests/cases/admin.yaml#L1104) |
 | Stack       | PHP 7 or 8 with MySQL                                                          | Laravel 13 on PHP 8.3+, with MySQL 8.4.                                                                                                                                               | [`composer.json`](composer.json)                                                                                              | Pest runs on MySQL 8.4 in CI                                                                                                                                                                                                                                                            |
 | Deliverable | Source code and database scripts                                               | This repo. The scripts are `database/migrations`, plus `database/schema.sql` as plain SQL.                                                                                            | [`database/`](database)                                                                                                       | Pest runs on MySQL 8.4 in CI                                                                                                                                                                                                                                                            |
@@ -127,6 +127,7 @@ You don't need any of this to mark the brief. It's here so you can tell what was
 - the database check that stops forged cookies
 - HttpOnly on both cookies
 - five readable sample stories at `/stories/{slug}`, behind the same consent gate ([STR-001](tests/cases/stories.yaml#L165) to [STR-022](tests/cases/stories.yaml#L683))
+- an English and Bahasa Melayu switch on the public site and in the consent box, remembered in a cookie ([LNG-001](tests/cases/language.yaml#L99) to [LNG-031](tests/cases/language.yaml#L281))
 - a live admin overview over free Pusher or Laravel Reverb, off until it's switched on ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
 
 The admin overview, with seeded demo data:
@@ -144,10 +145,10 @@ The admin overview, with seeded demo data:
 
 Five files carry the consent logic. Read them in this order.
 
-1. [`ConsentManager.php`](app/Support/Consent/ConsentManager.php). Start here. [`state()`](app/Support/Consent/ConsentManager.php#L49) decides if the box shows, and [`verifiedAccepted()`](app/Support/Consent/ConsentManager.php#L170) checks a cookie against the database.
+1. [`ConsentManager.php`](app/Support/Consent/ConsentManager.php). Start here. [`state()`](app/Support/Consent/ConsentManager.php#L50) decides if the box shows, and [`verifiedAccepted()`](app/Support/Consent/ConsentManager.php#L172) checks a cookie against the database.
 2. [`ConsentController.php`](app/Http/Controllers/ConsentController.php). The Accept and Decline endpoints, and the cookies they set.
 3. [`app.blade.php`](resources/views/app.blade.php#L45). The scroll lock, in the first HTML.
-4. [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx). The box, its exact copy and its two buttons.
+4. [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx). The box and its two buttons. The exact copy is in [`lang/en/site.php`](lang/en/site.php#L65).
 5. [`config/consent.php`](config/consent.php). The version, cookie names, lifetimes and rate limit.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -168,18 +169,18 @@ I ran each of these on a local copy on 9 Nov 2026. To edit a cookie, open DevToo
 <details>
 <summary>10 more ways to try</summary>
 
-| Try this                                             | What happens                                        |
-| ---------------------------------------------------- | --------------------------------------------------- |
-| Scroll with the box open                             | The page stays at 0px.                              |
-| Press Tab over and over                              | Focus stays on the box's two links and two buttons. |
-| Set the date to over a year ago                      | The box comes back.                                 |
-| Change the GUID to `not-a-guid`                      | The box comes back.                                 |
-| Keep a real GUID but move `accepted_at` back an hour | The box comes back.                                 |
-| Replace the whole value with `hello`                 | The box comes back.                                 |
-| Run locally with `CONSENT_VERSION=2` and a v1 cookie | The box comes back.                                 |
-| Accept, reopen with "Cookie settings", accept again  | Same GUID, still one row.                           |
-| Open `/admin` signed out                             | You land on the login page.                         |
-| Open `/register`                                     | 404. Nobody can sign up.                            |
+| Try this                                             | What happens                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| Scroll with the box open                             | The page stays at 0px.                                       |
+| Press Tab over and over                              | Focus stays on the box's links, language switch and buttons. |
+| Set the date to over a year ago                      | The box comes back.                                          |
+| Change the GUID to `not-a-guid`                      | The box comes back.                                          |
+| Keep a real GUID but move `accepted_at` back an hour | The box comes back.                                          |
+| Replace the whole value with `hello`                 | The box comes back.                                          |
+| Run locally with `CONSENT_VERSION=2` and a v1 cookie | The box comes back.                                          |
+| Accept, reopen with "Cookie settings", accept again  | Same GUID, still one row.                                    |
+| Open `/admin` signed out                             | You land on the login page.                                  |
+| Open `/register`                                     | 404. Nobody can sign up.                                     |
 
 </details>
 
@@ -211,6 +212,7 @@ What it doesn't do yet:
 - **Device data is three coarse fields:** device type, browser family and OS family. The server works them out on accept only. The raw user agent is never kept in the consent records. The breakdowns cover accepted visitors only, because declines carry no device data. iPadOS can report as macOS Desktop, so some iPads count as Macs.
 - **Database outage.** On a page view, if the row lookup fails, a cookie that passes the format checks is trusted, so readers aren't locked out. Accept never does this. If the database can't answer, the visitor gets an error message, no cookie is set and nothing is called saved. Decline has no such handling yet, so a failed Decline is a 500. To be honest about how far the page view fallback goes: with `SESSION_DRIVER=database`, which is what this app uses, the page returns 500 anyway because sessions fail first. I tried both drivers with the database down. The fallback and the Accept message only help on another session driver.
 - **Sessions still store IP and user agent.** Laravel's database session driver writes the raw IP and user agent to the `sessions` table for every visitor, including people who decline. That table is separate from the consent records, which don't hold either value, and the Privacy Statement says so. The fix is to move to a different session driver, such as Redis or cookies.
+- **Each record keeps the notice language,** `en` or `ms`, so you can tell which wording someone accepted. Records from before the switch are `en`, the only language then. The admin doesn't show it yet.
 - **Times are stored in UTC and shown in Malaysia time.** The admin's date filters and chart use Kuala Lumpur days, so picking 12 Oct means 12 Oct as the admin sees it.
 - **The admin can't be signed up for.** Registration is turned off. Login is rate limited to 5 tries a minute, and 2FA and passkeys are available in settings.
 - **Accept and decline are rate limited** at 30 a minute per IP (`CONSENT_THROTTLE`).
@@ -312,17 +314,17 @@ The table badge, the record page, the status filter and the CSV all use the same
 
 **Scroll lock before JavaScript.** The server works out whether the box is needed. When it is, the server puts a `consent-locked` class on `<html>` and an inline style turns off scrolling. React removes the class once the visitor chooses. While the box is open, the page behind it is `inert`, so keyboard and screen reader users can't reach it either.
 
-**The box itself.** It's an accessible alert dialog. Esc and clicking outside don't close it on a first visit. Accept and Decline look the same, so neither is pushed. On phones it's a bottom sheet. "Cookie settings" in the footer reopens it, so a visitor can change their mind.
+**The box itself.** It's an accessible alert dialog. Esc and clicking outside don't close it on a first visit. Accept and Decline look the same, so neither is pushed. On phones it's a bottom sheet. It has its own EN/BM switch, because the page behind it can't be reached. "Cookie settings" in the footer reopens it, so a visitor can change their mind.
 
 </details>
 
 <details>
 <summary><strong>Tests</strong></summary>
 
-Last full run on 9 Nov 2026: every test below passed, apart from the two real-server tests that are skipped by default.
+Last full run on 9 Nov 2026: every test below passed, apart from 7 skips: the two real-server tests, off by default, and five desktop-only checks in the phone run.
 
-- **Pest:** 304 tests (2,078 assertions) cover every consent rule, the admin portal, live updates and the stories. Time travel checks the 1-year and 1-day expiry.
-- **Playwright:** 152 tests cover consent, scroll lock, accessibility (axe), phone layout, the article pages, the live overview and the admin in desktop Chrome. The consent, phone-layout and article tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
+- **Pest:** 358 tests (2,952 assertions) cover every consent rule, the admin portal, live updates, the stories and the language switch. Time travel checks the 1-year and 1-day expiry.
+- **Playwright:** 199 tests cover consent, scroll lock, accessibility (axe), phone layout, the article pages, the live overview, the language switch and the admin in desktop Chrome. The consent, language, phone-layout and article tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
 - **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
 
@@ -348,7 +350,7 @@ It's off by default, so the app runs without it. It can run on free Pusher or on
 
 If a setting is missing, the page shows no badge and the app queues nothing for it.
 
-The stats, chart and recent list are live. The browser and device breakdowns refresh on page load.
+The stats and the daily, health, accept-rate and renewals charts are live. The browser and device breakdowns refresh on page load.
 
 </details>
 
@@ -357,12 +359,13 @@ The stats, chart and recent list are live. The browser and device breakdowns ref
 
 ```
 app/Support/Consent/        checking cookies against the database, withdrawals, device parsing
-app/Http/Middleware/        shares the consent state with every public page
+app/Http/Middleware/        shares the consent state and language with every public page
 app/Http/Controllers/       consent accept and decline, admin overview, table and record page
 app/Events/                 the "consents changed" broadcast
 routes/channels.php         who may listen to it
 resources/js/pages/site/    the four public pages and the story page
 resources/js/pages/admin/   admin overview, consents table and record page
+lang/                       English and Malay copy for the public site
 config/consent.php          version, cookie names, lifetimes, rate limit
 database/schema.sql         the schema as plain SQL
 tests/Feature/              Pest
