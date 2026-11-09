@@ -21,8 +21,8 @@
   <img alt="Inertia 3" src="https://img.shields.io/badge/Inertia-3-9553E9?logo=inertia&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="MySQL 8.4" src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white">
-  <img alt="Pest: 225 tests" src="https://img.shields.io/badge/Pest-225%20tests-F28D1A">
-  <img alt="Playwright: 92 tests" src="https://img.shields.io/badge/Playwright-92%20tests-2EAD33">
+  <img alt="Pest: 239 tests" src="https://img.shields.io/badge/Pest-239%20tests-F28D1A">
+  <img alt="Playwright: 95 tests" src="https://img.shields.io/badge/Playwright-95%20tests-2EAD33">
 </p>
 
 <p align="center">
@@ -123,7 +123,7 @@ You need PHP 8.3+, Composer, Node 24 with pnpm, and MySQL 8 (MariaDB 10.11 works
 git clone https://github.com/imanbinamran/meridian-consent.git meridian && cd meridian
 mysql -u root -e "CREATE DATABASE meridian"
 composer setup      # installs packages, writes .env, migrates, builds the frontend
-php artisan db:seed # the admin account plus 30 days of demo consents
+php artisan db:seed # the admin account, 30 days of demo consents and one expired consent
 composer dev        # http://localhost:8000
 ```
 
@@ -173,8 +173,8 @@ flowchart TD
     E -- Accept --> F[POST /consent/accept]
     E -- Decline --> G[POST /consent/decline]
     F --> H["New GUID, consents row and accepted event.<br/>Sets consent for 365 days"]
-    G --> I{"Holding a verified<br/>acceptance?"}
-    I -- Yes --> J[Marks that row withdrawn<br/>and writes a withdrawn event]
+    G --> I{"Cookie matches a consent row,<br/>even from an older notice?"}
+    I -- Yes --> J["Marks that row withdrawn and writes<br/>an event, unless it already was"]
     I -- No --> K[Adds to the anonymous decline count]
     J --> L["Sets consent_declined for 1 day<br/>and clears consent"]
     K --> L
@@ -205,7 +205,15 @@ So a hand-edited `consent` cookie can't hide the box while the database is up.
 
 Two limits. A real, live cookie copied to another browser still works, because the GUID is the only proof. And a hand-typed `consent_declined` can hide the box for up to a day. Declines are anonymous, so there's no row to check. It records no consent.
 
-**Changing your mind.** Declining while holding a valid acceptance marks that record withdrawn and writes an event. The `consent` cookie is cleared, and putting it back doesn't help because the row is no longer live. Accepting later issues a new GUID and a new row.
+**Changing your mind.** Declining while holding an acceptance that matches its row marks that record withdrawn and writes an event. This works for a cookie from an older notice too. The `consent` cookie is cleared, and putting it back doesn't help because the row is no longer live. Declining again with that old cookie adds nothing. Accepting later issues a new GUID and a new row.
+
+**Status in the admin.** Each record is one of three things, worked out when it's read:
+
+- **Withdrawn:** the visitor declined after accepting. This wins over Expired.
+- **Expired:** 365 days have passed since it was accepted, or it's on an older notice version than the current one.
+- **Active:** neither of those.
+
+The table badge, the record page, the status filter and the CSV all use the same rule.
 
 **Versions.** `CONSENT_VERSION` in `.env` is the version of the notice. Raise it to 2 and every visitor who accepted version 1 sees the box again. That's how you'd handle a change to the Privacy Statement.
 
@@ -219,13 +227,13 @@ Two limits. A real, live cookie copied to another browser still works, because t
 
 - **The server owns the decision.** The browser never creates consent cookies. The GUID, time and version come from the server. A cookie the browser sends back counts only if a live row agrees with it, and what gets stored comes from the server or that row. This keeps the cookie and the database row in step.
 - **Accepting twice makes one row.** The buttons turn off while a choice is saving. After that, accepting with a verified cookie keeps its GUID and writes nothing.
-- **Declines are counted, never identified.** The brief only asks for a cookie on decline. I also store an anonymous count (version and time only, no GUID, no IP), so the admin can see the accept rate without tracking people who said no.
+- **The decline count holds no ID.** The brief only asks for a cookie on decline. I also store a count (version and time only, no GUID, no IP), so the admin can see the accept rate. The session record below still exists for people who decline.
 - **A withdrawal isn't a decline in the count.** That person already has a record, so the record changes and the anonymous decline count doesn't.
 - **The version stays 1,** as the brief says. On a live product, adding device data would be a reason to raise it and ask everyone again.
 - **No preference centre.** The site sets no optional cookies, so toggles would control nothing. The brief also fixes the choice as Accept and Decline.
 - **Device data is three coarse fields:** device type, browser family and OS family. The server works them out on accept only. The raw user agent is never kept in the consent records. The breakdowns cover accepted visitors only, because declines carry no device data. iPadOS can report as macOS Desktop, so some iPads count as Macs.
-- **Database outage.** If the row lookup fails, a cookie that passes the format checks is trusted, so readers aren't locked out. To be honest about how far that goes: with `SESSION_DRIVER=database`, which is what this app uses, the page returns 500 anyway because sessions fail first. I tried both drivers with the database down. The fallback only helps on another session driver.
-- **Sessions still store IP and user agent.** Laravel's database session driver writes the raw IP and user agent to the `sessions` table for every visitor, including people who decline. The consent records don't hold them, but that table does. The fix is to move to a different session driver, such as Redis or cookies.
+- **Database outage.** On a page view, if the row lookup fails, a cookie that passes the format checks is trusted, so readers aren't locked out. Accept never does this. If the database can't answer, the visitor gets an error message, no cookie is set and nothing is called saved. Decline has no such handling yet, so a failed Decline is a 500. To be honest about how far the page view fallback goes: with `SESSION_DRIVER=database`, which is what this app uses, the page returns 500 anyway because sessions fail first. I tried both drivers with the database down. The fallback and the Accept message only help on another session driver.
+- **Sessions still store IP and user agent.** Laravel's database session driver writes the raw IP and user agent to the `sessions` table for every visitor, including people who decline. That table is separate from the consent records, which don't hold either value, and the Privacy Statement says so. The fix is to move to a different session driver, such as Redis or cookies.
 - **Times are stored in UTC and shown in Malaysia time.** The admin's date filters and chart use Kuala Lumpur days, so picking 12 Oct means 12 Oct as the admin sees it.
 - **The admin can't be signed up for.** Registration is turned off. Login is rate limited to 5 tries a minute, and 2FA and passkeys are available in settings.
 - **Accept and decline are rate limited** at 30 a minute per IP (`CONSENT_THROTTLE`).
@@ -235,8 +243,8 @@ Two limits. A real, live cookie copied to another browser still works, because t
 
 Last full run on 9 Nov 2026: every test below passed.
 
-- **Pest:** 225 tests (1,692 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
-- **Playwright:** 92 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
+- **Pest:** 239 tests (1,797 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
+- **Playwright:** 95 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
 - **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
 
@@ -267,6 +275,7 @@ tests/e2e/                  Playwright
 - **Admin roles.** Any verified user is an admin today. That's safe only because registration is off.
 - **Server-side rendering.** The page needs JavaScript to show content. Inertia SSR would make it work without it.
 - **Bahasa Malaysia.** The layout is ready for translation, but the copy is English only.
+- **A retention period.** Consent records and the decline count are kept with no end date today. I'd set one and prune past it.
 - **Real phones.** Phone checks ran in emulation. I'd confirm safe areas and tap behaviour on a real iPhone and Android.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
