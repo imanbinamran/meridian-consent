@@ -41,7 +41,7 @@ export default defineConfig({
             // flow run on desktop only (a11y sets both viewports itself).
             name: 'chromium-mobile',
             use: { ...devices['Pixel 7'] },
-            testMatch: /(consent|responsive)\.spec\.ts/,
+            testMatch: /(consent|responsive|stories)\.spec\.ts/,
             dependencies: ['setup'],
         },
     ],

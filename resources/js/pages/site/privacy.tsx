@@ -185,6 +185,14 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         in to our admin area also receive a cookie that
                         remembers how their sidebar is laid out.
                     </p>
+                    <p>
+                        If you accept cookies, your browser also remembers how
+                        far you have read each story, so you can pick up where
+                        you left off. This is kept in your browser&rsquo;s local
+                        storage under <code>meridian.reading</code>. It is never
+                        sent to us, and it is removed if you decline or your
+                        choice expires.
+                    </p>
                 </>
             ),
         },

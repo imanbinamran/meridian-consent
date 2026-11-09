@@ -1,0 +1,559 @@
+/*
+| Article pages. The rule for all of this: running text never moves, fades or
+| dims. Motion happens before reading starts, in the margin, and after the
+| last line.
+*/
+.story-page {
+    --story-head: 65px;
+    --story-inset: calc(var(--story-head) + env(safe-area-inset-top, 0px));
+    --story-rail-height: calc(100dvh - var(--story-head) - 88px);
+}
+
+@media (min-width: 40rem) {
+    .story-page {
+        --story-head: 102px;
+    }
+}
+
+.story-word {
+    display: inline-block;
+}
+
+.story-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 40rem) minmax(0, 1fr);
+    column-gap: 2.5rem;
+    view-timeline: --story block;
+    view-timeline-inset: var(--story-inset) 0px;
+}
+
+.story-body {
+    grid-column: 2;
+    min-width: 0;
+    font-size: 1.22rem;
+    line-height: 1.68;
+}
+
+.story-body p + p {
+    margin-top: 1.05em;
+}
+
+.story-section {
+    scroll-margin-top: calc(var(--story-inset) + 2rem);
+}
+
+.story-section + .story-section {
+    margin-top: 2.6em;
+}
+
+.story-section h2 {
+    margin-bottom: 1em;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.story-lede::first-letter {
+    float: inline-start;
+    padding-top: 0.07em;
+    padding-inline-end: 0.09em;
+    color: var(--brand);
+    font-size: 4.25em;
+    font-weight: 500;
+    line-height: 0.78;
+}
+
+.story-rule {
+    display: block;
+    height: 1px;
+    margin-bottom: 1.1em;
+    background: color-mix(in oklab, var(--foreground) 28%, transparent);
+    transform-origin: left;
+    transition: transform 620ms var(--ease-out-strong);
+}
+
+.story-rule:dir(rtl) {
+    transform-origin: right;
+}
+
+.story-rule.pending {
+    transform: scaleX(0);
+}
+
+.story-pullquote {
+    margin-block: 1.7em;
+    font-size: 1.62em;
+    font-style: italic;
+    font-weight: 500;
+    line-height: 1.26;
+    text-wrap: balance;
+}
+
+.story-guide {
+    margin-block: 1.6em;
+    padding-block: 0.75rem;
+    border-block: 2px solid var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+}
+
+.story-guide figcaption {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.story-guide dl > div {
+    display: grid;
+    grid-template-columns: 8.5em minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-block: 0.45rem;
+    border-top: 1px solid var(--border);
+}
+
+.story-guide dt {
+    font-style: italic;
+    font-weight: 500;
+}
+
+.story-guide dd {
+    color: var(--muted-foreground);
+}
+
+/* The line beside the text. */
+.story-rail {
+    position: sticky;
+    top: calc(var(--story-inset) + 1.5rem);
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    width: 190px;
+    height: var(--story-rail-height);
+    font-family: var(--font-sans);
+}
+
+.story-rail-track,
+.story-rail-fill {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 10px;
+    width: 1px;
+    background: color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+
+.story-rail-fill {
+    width: 2px;
+    margin-inline-end: -0.5px;
+    background: var(--brand);
+    transform: scaleY(var(--progress, 0));
+    transform-origin: top;
+}
+
+.story-rail-globe {
+    position: absolute;
+    top: -9px;
+    inset-inline-end: 1px;
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: var(--background);
+    color: var(--brand);
+    transform: translateY(calc(var(--progress, 0) * var(--story-rail-height)));
+}
+
+.story-rail-globe svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.story-rail-turn {
+    transform: scaleX(var(--turn, 1));
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+.story-rail-ticks a {
+    position: absolute;
+    inset-inline-end: 30px;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: end;
+    white-space: nowrap;
+    transform: translateY(-50%);
+    transition: color 200ms;
+}
+
+.story-rail-ticks a:hover,
+.story-rail-ticks a[aria-current='true'] {
+    color: var(--foreground);
+}
+
+.story-rail-ticks a[aria-current='true'] {
+    font-weight: 500;
+}
+
+.story-rail-ticks a::after {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: -20px;
+    width: 9px;
+    height: 1px;
+    background: color-mix(in oklab, var(--foreground) 28%, transparent);
+    content: '';
+}
+
+.story-rail-ticks a[aria-current='true']::after {
+    background: var(--brand);
+}
+
+/* Too many sections for this screen: name only the current one. */
+.story-rail[data-crowded] .story-rail-ticks a:not([aria-current='true']) {
+    color: transparent;
+}
+
+.story-rail[data-crowded] .story-rail-ticks a:focus-visible,
+.story-rail[data-crowded] .story-rail-ticks a:hover {
+    color: var(--foreground);
+}
+
+.story-rail-left {
+    position: absolute;
+    bottom: -26px;
+    inset-inline-end: 30px;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.story-rail-now {
+    display: none;
+}
+
+/* Phones and tablets: there is no margin, so it folds into a bar. */
+@media (max-width: 1099px) {
+    .story-page {
+        --story-inset: calc(
+            var(--story-head) + env(safe-area-inset-top, 0px) + 36px
+        );
+    }
+
+    .story-grid {
+        display: block;
+    }
+
+    .story-body {
+        max-width: 40rem;
+        margin-inline: auto;
+        font-size: 1.16rem;
+    }
+
+    .story-rail {
+        top: calc(var(--story-head) + env(safe-area-inset-top, 0px));
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-self: stretch;
+        width: 100%;
+        height: 36px;
+        margin-bottom: 1.25rem;
+        background: var(--background);
+    }
+
+    .story-rail-ticks,
+    .story-rail-globe,
+    .story-rail-left {
+        display: none;
+    }
+
+    .story-rail-track,
+    .story-rail-fill {
+        inset: auto 0 0;
+        width: auto;
+        height: 1px;
+        margin: 0;
+    }
+
+    .story-rail-fill {
+        height: 2px;
+        transform: scaleX(var(--progress, 0));
+        transform-origin: left;
+    }
+
+    .story-rail-fill:dir(rtl) {
+        transform-origin: right;
+    }
+
+    .story-rail-now {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .story-rail-now span:last-child {
+        color: var(--muted-foreground);
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+}
+
+@keyframes story-fill-y {
+    from {
+        transform: scaleY(0);
+    }
+
+    to {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes story-fill-x {
+    from {
+        transform: scaleX(0);
+    }
+
+    to {
+        transform: scaleX(1);
+    }
+}
+
+@keyframes story-globe-travel {
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(var(--story-rail-height));
+    }
+}
+
+@keyframes story-globe-turn {
+    0%,
+    50%,
+    100% {
+        transform: scaleX(1);
+    }
+
+    25%,
+    75% {
+        transform: scaleX(-1);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+        .story-rail-fill,
+        .story-rail-globe,
+        .story-rail-turn {
+            animation: story-fill-y auto linear both;
+            animation-timeline: --story;
+            animation-range: contain 0% contain 100%;
+        }
+
+        .story-rail-globe {
+            animation-name: story-globe-travel;
+        }
+
+        .story-rail-turn {
+            animation-name: story-globe-turn;
+        }
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 1099px) {
+    @supports (animation-timeline: view()) {
+        .story-rail-fill {
+            animation-name: story-fill-x;
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .story-rail-globe {
+        display: none;
+    }
+}
+
+/* The end of a story. */
+.story-endmark {
+    position: relative;
+    display: inline-block;
+    width: 0.72em;
+    height: 0.72em;
+    margin-inline-start: 0.35em;
+    color: var(--brand);
+    vertical-align: -0.04em;
+    transition:
+        transform 620ms var(--ease-out-strong),
+        opacity 420ms ease-out;
+}
+
+.story-endmark svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.story-endmark.pending {
+    opacity: 0;
+    transform: scale(2.1);
+}
+
+.story-endmark::after {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--brand);
+    border-radius: 50%;
+    opacity: 0;
+    content: '';
+}
+
+.story-finish {
+    display: grid;
+    gap: 1.375rem;
+}
+
+.story-finish-part {
+    transition:
+        transform 620ms var(--ease-out-strong),
+        opacity 420ms ease-out;
+}
+
+.story-finish-part:nth-child(2) {
+    transition-delay: 90ms;
+}
+
+.story-finish-part:nth-child(3) {
+    transition-delay: 180ms;
+}
+
+.story-finish-part.pending {
+    opacity: 0;
+    transform: translateY(14px);
+}
+
+@keyframes story-ring {
+    from {
+        opacity: 0.7;
+        transform: scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(3.4);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .story-endmark.stamped::after {
+        animation: story-ring 720ms var(--ease-out-strong) both;
+    }
+}
+
+/*
+| The headline moves word by word into the article. Everything here is scoped
+| to .story-morph so it cannot touch the theme switch's view transition.
+*/
+html.story-morph .site-header {
+    view-transition-name: site-header;
+}
+
+html.story-morph .is-morphing .story-word {
+    view-transition-name: var(--vt);
+}
+
+@keyframes story-out {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes story-in {
+    from {
+        opacity: 0;
+    }
+}
+
+html.story-morph::view-transition-group(*) {
+    animation-duration: 520ms;
+    animation-timing-function: var(--ease-in-out-strong);
+}
+
+html.story-morph::view-transition-old(*),
+html.story-morph::view-transition-new(*) {
+    height: 100%;
+}
+
+html.story-morph::view-transition-old(root) {
+    animation: story-out 180ms ease-out both;
+}
+
+html.story-morph::view-transition-new(root) {
+    animation: story-in 320ms 200ms ease-out both;
+}
+
+html.story-morph::view-transition-group(w1) {
+    animation-delay: 16ms;
+}
+
+html.story-morph::view-transition-group(w2) {
+    animation-delay: 32ms;
+}
+
+html.story-morph::view-transition-group(w3) {
+    animation-delay: 48ms;
+}
+
+html.story-morph::view-transition-group(w4) {
+    animation-delay: 64ms;
+}
+
+html.story-morph::view-transition-group(w5) {
+    animation-delay: 80ms;
+}
+
+html.story-morph::view-transition-group(w6) {
+    animation-delay: 96ms;
+}
+
+html.story-morph::view-transition-group(w7) {
+    animation-delay: 112ms;
+}
+
+html.story-morph::view-transition-group(w8) {
+    animation-delay: 128ms;
+}
+
+html.story-morph::view-transition-group(w9) {
+    animation-delay: 144ms;
+}
+
+html.story-morph::view-transition-group(w10) {
+    animation-delay: 160ms;
+}
+
+html.story-morph::view-transition-group(w11) {
+    animation-delay: 176ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.story-morph::view-transition-group(*),
+    html.story-morph::view-transition-old(*),
+    html.story-morph::view-transition-new(*) {
+        animation: none !important;
+    }
+
+    .story-rule,
+    .story-endmark,
+    .story-finish-part {
+        transition: none;
+    }
+}

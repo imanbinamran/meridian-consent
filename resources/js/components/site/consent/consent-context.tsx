@@ -1,6 +1,14 @@
 import { router, usePage } from '@inertiajs/react';
-import { createContext, use, useEffect, useRef, useState } from 'react';
+import {
+    createContext,
+    use,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from 'react';
 import type { ReactNode } from 'react';
+import { setReadingStorageAllowed } from '@/components/site/story/reading-store';
 import { accept, decline } from '@/routes/consent';
 
 export type ConsentChoice = 'accepted' | 'declined';
@@ -44,6 +52,11 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
         return () => document.documentElement.classList.remove(LOCK_CLASS);
     }, [open]);
+
+    // Layout effect: pages read saved progress in their own effects, after this.
+    useLayoutEffect(() => {
+        setReadingStorageAllowed(consent.choice === 'accepted');
+    }, [consent.choice]);
 
     const choose = (choice: ConsentChoice) => {
         if (inFlight.current) {

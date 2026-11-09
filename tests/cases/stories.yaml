@@ -1,0 +1,704 @@
+# case-spec/1 · article pages
+#
+# Layer tags on every case say who proves it:
+#   pest   -> tests/Feature (PHP feature test, server side)
+#   e2e    -> tests/e2e (Playwright, real browser)
+contract: case-spec/1
+title: Meridian · article pages and reading motion
+feature: Five stories at /stories/{slug}, with motion before, beside and after the text
+status: ready
+owner: Amirul
+
+sources:
+    - {
+          id: S1,
+          kind: chat,
+          ref: 'Approved brief: make the articles work, with animation tailored to reading',
+      }
+    - {
+          id: S2,
+          kind: design,
+          ref: 'https://claude.ai/artifact/9KvBUTYmBakML3kFguMDVp (My pick: variants 1, 2 and 4, plus section rules from 3)',
+      }
+    - {
+          id: S3,
+          kind: code,
+          ref: 'tests/cases/consent.yaml (the consent rules these pages must keep)',
+      }
+
+requirements:
+    - {
+          id: REQ-1,
+          text: 'The four edition stories and the Sunday long read each open a full article at /stories/{slug}',
+          anchor: 'S1 real articles',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-2,
+          text: 'An unknown story address returns 404',
+          anchor: 'S1 real articles',
+          risk: { impact: 2, likelihood: 1 },
+      }
+    - {
+          id: REQ-3,
+          text: 'Read time is worked out from the word count at 220 words a minute, rounded up',
+          anchor: 'S1 read time',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-4,
+          text: 'A home page headline matches its article headline word for word',
+          anchor: 'S2 Entering risk',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-5,
+          text: 'Opening a story from the home page moves the headline into the article, one word at a time',
+          anchor: 'S2 Entering',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-6,
+          text: 'Browser Back from an article returns to the same place on the home page',
+          anchor: 'S1 proof list',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-7,
+          text: 'A first-time visitor on a direct article link gets the consent box and cannot scroll',
+          anchor: 'S1 consent gate',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-8,
+          text: 'Running text never moves, fades or dims while being read, and scrolling causes no layout shift',
+          anchor: 'S1 rules',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-9,
+          text: 'A line beside the text shows reading progress, the current section and the time left; on phones it folds into a bar',
+          anchor: 'S2 Keeping place',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-10,
+          text: 'Reaching the last line marks the end, shows the reading time and offers the next story',
+          anchor: 'S2 Finishing',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-11,
+          text: 'Reading position is saved in the browser only after Accept, and removed on decline',
+          anchor: 'S1 storage rule',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-12,
+          text: 'A saved position can be resumed from the home page',
+          anchor: 'S2 Keeping place',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-13,
+          text: 'With reduced motion on, nothing travels and all content is still shown',
+          anchor: 'S1 rules',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-14,
+          text: 'Articles work at 320px wide, in dark mode and right to left',
+          anchor: 'S1 proof list',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-15,
+          text: 'Article pages have no serious accessibility issues',
+          anchor: 'S3 CON-070',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-16,
+          text: 'The Privacy page tells visitors about the saved reading position',
+          anchor: 'S1 storage rule',
+          risk: { impact: 2, likelihood: 1 },
+      }
+
+scope:
+    in:
+        - Story routes and data
+        - Home page links
+        - Motion between pages, beside the text and after the last line
+        - Saved reading position and its consent rule
+    out:
+        - {
+              item: 'Frame-by-frame look of the headline move',
+              reason: 'Shown on video in the proof; the suite checks the transition runs and ends correctly',
+          }
+        - {
+              item: 'Editorial quality of the sample stories',
+              reason: 'Sample content, judged by a person',
+          }
+        - {
+              item: 'Safari and Firefox runs in CI',
+              reason: 'The repo suite runs Chromium only; Safari and Firefox are one-off proof runs',
+          }
+
+roles:
+    - { id: visitor, auth_env: [] }
+
+environments: [local, ci]
+
+fixtures:
+    - id: F1
+      text: 'Fresh browser context with no cookies and no local storage'
+      setup: 'New browser context per test'
+      cleanup: 'Context closed at the end of the test'
+    - id: F2
+      text: 'Kopitiam story: /stories/the-quiet-return-of-the-neighbourhood-kopitiam'
+      setup: 'Ships in resources/data/stories.php'
+      cleanup: 'None needed'
+
+assumptions: []
+
+cases:
+    - id: STR-001
+      title: Every story opens with HTTP 200 and its own headline
+      type: api
+      scenario_class: api
+      priority: P1
+      technique: equivalence
+      required: true
+      mutates: none
+      requirement_refs: [REQ-1]
+      role: visitor
+      data: { stories: 'every entry in the story data' }
+      steps: ['Request /stories/{slug} for each story']
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Status and component,
+                expected: "Each responds 200 with Inertia component 'site/story'",
+                provenance: REQ-1,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Headline,
+                expected: 'story.title equals the title in the story data',
+                provenance: REQ-1,
+            }
+      tags: [pest]
+
+    - id: STR-002
+      title: An unknown story address returns 404
+      type: api
+      scenario_class: api
+      priority: P2
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-2]
+      role: visitor
+      data: { path: '/stories/not-a-real-story' }
+      steps: ['Request /stories/not-a-real-story']
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Status,
+                expected: 'Responds 404',
+                provenance: REQ-2,
+            }
+      tags: [pest]
+
+    - id: STR-003
+      title: Read time follows the word count at the boundary
+      type: api
+      scenario_class: api
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: none
+      requirement_refs: [REQ-3]
+      role: visitor
+      data: { words: [220, 221] }
+      steps: ['Work out minutes for each story and compare with its word count']
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Rounds up,
+                expected: 'For every story, minutes equals word count divided by 220, rounded up',
+                provenance: REQ-3,
+            }
+      tags: [pest]
+
+    - id: STR-004
+      title: Home page lists the edition and long read with the article titles
+      type: api
+      scenario_class: api
+      priority: P2
+      technique: data_integrity
+      required: true
+      mutates: none
+      requirement_refs: [REQ-4, REQ-1]
+      role: visitor
+      steps: ['Request /']
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Edition,
+                expected: "Prop 'edition' has 4 stories in the order Business, Nation, Food, Culture",
+                provenance: REQ-1,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Long read,
+                expected: "Prop 'longRead.title' is 'Kampung to cloud: the quiet digitisation of rural Sabah'",
+                provenance: REQ-4,
+            }
+          - {
+                id: A3,
+                kind: api,
+                description: Same words,
+                expected: 'Each edition title is identical to story.title on its article',
+                provenance: REQ-4,
+            }
+      tags: [pest]
+
+    - id: STR-010
+      title: Clicking a home page story moves its headline into the article
+      type: web
+      scenario_class: temporal
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-1, REQ-5]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted']
+      steps:
+          ['Open /', "Click 'The quiet return of the neighbourhood kopitiam'"]
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Arrives,
+                expected: 'URL is the kopitiam story and the level-1 heading reads its title',
+                provenance: REQ-1,
+            }
+          - {
+                id: A2,
+                kind: timing,
+                description: Word groups,
+                expected: 'While the page changes there are at least 7 word transition groups, and all have ended within 2 s of the click',
+                provenance: REQ-5,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Focus,
+                expected: 'Keyboard focus is on the level-1 heading afterwards',
+                provenance: standard,
+                notes: 'WCAG 2.4.3 focus order',
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-011
+      title: Browser Back returns to the same place on the home page
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-6]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted', 'Viewport 375x812']
+      steps:
+          [
+              'Open /',
+              'Scroll the kopitiam row into view',
+              'Open the story',
+              'Press browser Back',
+          ]
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Row in view,
+                expected: 'The kopitiam row is inside the viewport',
+                provenance: REQ-6,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Scroll,
+                expected: 'Page scroll position is within 40px of where it was before the click',
+                provenance: REQ-6,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-012
+      title: A direct article link shows the consent box and locks scrolling
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-7]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps: ['Open the kopitiam story directly', 'Try to scroll down']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Box,
+                expected: "The 'Cookie consent' box is visible",
+                provenance: REQ-7,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Locked,
+                expected: 'Page scroll position stays 0 after scrolling',
+                provenance: REQ-7,
+            }
+      tags: [e2e, pest]
+
+    - id: STR-013
+      title: Text stays still while the reader scrolls
+      type: web
+      scenario_class: render
+      priority: P1
+      technique: regression
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-8]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted', 'Fonts loaded']
+      steps: ['Open the kopitiam story', 'Wheel-scroll to the end']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Layout shift,
+                expected: 'Cumulative layout shift while scrolling is below 0.001',
+                provenance: REQ-8,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Paragraphs,
+                expected: 'Every story paragraph has transform none, opacity 1 and no running animation at every step',
+                provenance: REQ-8,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-014
+      title: The margin line tracks progress, section and time left
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-9]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted', 'Viewport 1280x800']
+      steps: ['Open the kopitiam story', "Scroll to the section 'What stays'"]
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Section,
+                expected: "The current section in the line is 'What stays'",
+                provenance: REQ-9,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Fill,
+                expected: 'The filled part of the line is between 20% and 80% of its length',
+                provenance: REQ-9,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Time,
+                expected: "Time left reads 'N min left' with N below the story's read time",
+                provenance: REQ-9,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-015
+      title: On a phone the line folds into a bar under the header
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: compatibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-9]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted', 'Viewport 375x812']
+      steps: ['Open the kopitiam story', 'Scroll to the second section']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Pinned,
+                expected: 'The bar sits directly under the site header and spans the text width',
+                provenance: REQ-9,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Label,
+                expected: "The bar reads 'The handover' and 'N min left'",
+                provenance: REQ-9,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-016
+      title: Reaching the last line shows the end of the story and the next one
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-10]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted']
+      steps:
+          [
+              'Open the kopitiam story',
+              'Scroll to the end',
+              'Click the next story',
+          ]
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Time,
+                expected: "A line containing 'on this story' is visible",
+                provenance: REQ-10,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Next,
+                expected: "A link to 'Inside the Ipoh studio reviving hand-painted cinema posters' is visible",
+                provenance: REQ-10,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Navigates,
+                expected: 'URL becomes the Ipoh studio story and its heading matches',
+                provenance: REQ-10,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-017
+      title: Accepting saves the reading position and it can be resumed
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-11, REQ-12]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted']
+      steps:
+          [
+              'Open the kopitiam story',
+              'Scroll about halfway',
+              'Reload the home page',
+              'Click the kopitiam row',
+          ]
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Saved,
+                expected: "Local storage key 'meridian.reading' holds this story with progress above 0.2",
+                provenance: REQ-11,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Offer,
+                expected: "The row reads 'pick up where you left off'",
+                provenance: REQ-12,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Resumes,
+                expected: 'The story opens scrolled down, not at the top (scroll position above 300px)',
+                provenance: REQ-12,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-018
+      title: Without Accept nothing is saved, and declining removes what was
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-11]
+      role: visitor
+      preconditions: [Fixture F1]
+      steps:
+          [
+              'Accept, read halfway',
+              'Open Cookie settings and Decline',
+              'Scroll the story further',
+          ]
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Decline removes,
+                expected: "Local storage key 'meridian.reading' is absent after declining",
+                provenance: REQ-11,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Stays absent,
+                expected: "Local storage key 'meridian.reading' is still absent after scrolling",
+                provenance: REQ-11,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-019
+      title: With reduced motion nothing travels and everything shows
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: accessibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-13]
+      role: visitor
+      preconditions:
+          [Fixture F1, 'Cookies accepted', 'prefers-reduced-motion is reduce']
+      steps: ['Open / and click the kopitiam row', 'Scroll to the end']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: No globe,
+                expected: 'The travelling globe is not displayed',
+                provenance: REQ-13,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Line still fills,
+                expected: 'The line still reports progress above 0',
+                provenance: REQ-13,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: End visible,
+                expected: 'The next story link is visible with opacity 1 and section rules have no scale applied',
+                provenance: REQ-13,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-020
+      title: Every story fits 320px wide, in dark mode and right to left
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: compatibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-14]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted', 'Viewport 320x700']
+      data: { modes: ['light left to right', 'dark', 'right to left'] }
+      steps: ['Open each story in each mode']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: No sideways scroll,
+                expected: 'Document scroll width is at most the viewport width',
+                provenance: REQ-14,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-021
+      title: An article has no serious accessibility issues
+      type: web
+      scenario_class: render
+      priority: P1
+      technique: accessibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-15]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted']
+      steps:
+          [
+              'Open the kopitiam story at phone and desktop size',
+              'Run an axe scan for WCAG 2.2 AA',
+          ]
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Axe,
+                expected: 'Zero serious or critical issues (WCAG 2.2 AA)',
+                provenance: standard,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: STR-022
+      title: The Privacy page names the saved reading position
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-16]
+      role: visitor
+      preconditions: [Fixture F1, 'Cookies accepted']
+      steps: ['Open /privacy']
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Named,
+                expected: "The page text contains 'meridian.reading'",
+                provenance: REQ-16,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]

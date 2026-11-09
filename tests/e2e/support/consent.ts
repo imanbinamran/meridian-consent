@@ -80,6 +80,8 @@ export async function settleAnimations(page: Page): Promise<void> {
         Promise.all(
             document
                 .getAnimations()
+                // Scroll-driven animations never finish on their own.
+                .filter((a) => a.timeline instanceof DocumentTimeline)
                 .filter((animation) => animation.playState === 'running')
                 .map((animation) => animation.finished.catch(() => undefined)),
         ),
