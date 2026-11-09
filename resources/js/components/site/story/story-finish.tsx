@@ -108,7 +108,7 @@ export function StoryFinish({ story }: { story: Story }) {
                     <span className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                         {story.next.desk} · {story.next.minutes} min read
                     </span>
-                    <span className="mt-1.5 block font-display text-3xl leading-[1.12] font-medium tracking-tight text-balance decoration-brand decoration-1 underline-offset-[5px] group-hover:underline sm:text-4xl">
+                    <span className="mt-1.5 block font-display text-3xl leading-[1.12] font-medium tracking-tight text-balance decoration-brand decoration-2 underline-offset-[5px] transition-colors group-hover:text-brand group-hover:underline sm:text-4xl">
                         <Headline text={story.next.title} />
                     </span>
                 </StoryLink>

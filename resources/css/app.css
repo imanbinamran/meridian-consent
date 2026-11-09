@@ -151,6 +151,10 @@
     html {
         @apply font-sans;
     }
+    /* Focus lands here after Back to top. It needs no ring of its own. */
+    main[tabindex='-1']:focus {
+        outline: none;
+    }
 }
 
 @theme inline {

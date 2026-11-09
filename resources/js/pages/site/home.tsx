@@ -81,7 +81,7 @@ function EditionRow({
             <StoryLink
                 slug={story.slug}
                 resume={resumable}
-                className="group relative flex gap-5 py-5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="group relative -mx-3 flex gap-5 rounded-lg px-3 py-5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
                 <span
                     aria-hidden="true"
@@ -94,7 +94,7 @@ function EditionRow({
                         {story.desk}
                         <span className="sr-only"> desk</span>
                     </span>
-                    <span className="mt-1.5 block font-display text-lg leading-snug font-medium text-pretty decoration-brand decoration-1 underline-offset-4 group-hover:underline">
+                    <span className="mt-1.5 block font-display text-lg leading-snug font-medium text-pretty decoration-brand decoration-2 underline-offset-4 transition-colors group-hover:text-brand group-hover:underline">
                         <Headline text={story.title} />
                     </span>
                     <span className="mt-1.5 block text-xs text-muted-foreground">
@@ -264,7 +264,7 @@ export default function Home({
                         >
                             <StoryLink
                                 slug={longRead.slug}
-                                className="rounded-sm decoration-brand-bright decoration-2 underline-offset-[6px] hover:underline focus-visible:ring-2 focus-visible:ring-brand-bright focus-visible:ring-offset-4 focus-visible:ring-offset-ink focus-visible:outline-none"
+                                className="rounded-sm decoration-brand-bright decoration-2 underline-offset-[6px] transition-colors hover:text-brand-bright hover:underline focus-visible:ring-2 focus-visible:ring-brand-bright focus-visible:ring-offset-4 focus-visible:ring-offset-ink focus-visible:outline-none"
                             >
                                 <Headline text={longRead.title} />
                             </StoryLink>
@@ -308,7 +308,7 @@ export default function Home({
                         {figures.map((figure) => (
                             <div
                                 key={figure.label}
-                                className="flex flex-col-reverse gap-2 pe-4 lg:px-8 lg:first:ps-0"
+                                className="flex flex-col-reverse justify-end gap-2 pe-4 lg:px-8 lg:first:ps-0"
                             >
                                 <dt className="text-sm leading-snug text-muted-foreground">
                                     {figure.label}

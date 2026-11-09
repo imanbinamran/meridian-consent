@@ -65,7 +65,7 @@ export function StoryLink({
             prefetch
             preserveScroll={resume}
             viewTransition={resume ? false : endMorphWhenDone}
-            className={cn(morphClass(slug), className)}
+            className={cn('cursor-pointer', morphClass(slug), className)}
             onClick={(event) => {
                 focusHeadingOnArrival();
 

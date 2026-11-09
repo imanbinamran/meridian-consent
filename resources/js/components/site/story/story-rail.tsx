@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { KeyboardEvent, PointerEvent, RefObject } from 'react';
 import { saveProgress } from './reading-store';
 import type { StorySection } from './types';
 
@@ -10,13 +10,37 @@ const MIN_LABEL_GAP = 22;
 /** The phone bar sits under the site header and is this tall. */
 const PHONE_BAR = 36;
 
+/** How far each key moves the globe, as a share of the story. */
+const KEY_STEPS: Record<string, number> = {
+    ArrowUp: -0.02,
+    ArrowLeft: -0.02,
+    ArrowDown: 0.02,
+    ArrowRight: 0.02,
+    PageUp: -0.1,
+    PageDown: 0.1,
+};
+
 function clamp(value: number): number {
     return Math.min(1, Math.max(0, value));
 }
 
+/** Where the story starts on the page and how far it scrolls. Desktop only. */
+function storyScroll(story: HTMLElement) {
+    const top =
+        document.querySelector('.site-header')?.getBoundingClientRect()
+            .bottom ?? 0;
+    const box = story.getBoundingClientRect();
+
+    return {
+        start: box.top + scrollY - top,
+        range: box.height - (innerHeight - top),
+    };
+}
+
 /**
  * The line beside the text. It shows the story to scale, with a small globe
- * that turns as it travels. On phones it folds into a bar under the header.
+ * that turns as it travels and can be dragged to scroll the story. On phones
+ * it folds into a bar under the header.
  * Scroll-driven CSS moves it where supported; otherwise measure() does.
  */
 export function StoryRail({
@@ -37,6 +61,83 @@ export function StoryRail({
     const [crowded, setCrowded] = useState(false);
     const [current, setCurrent] = useState(0);
     const [left, setLeft] = useState(`${minutes} min left`);
+    const [percent, setPercent] = useState(0);
+    const [dragging, setDragging] = useState(false);
+    const drag = useRef<{
+        pointerY: number;
+        scroll: number;
+        perPixel: number;
+        min: number;
+        max: number;
+    } | null>(null);
+
+    const startDrag = (event: PointerEvent<HTMLDivElement>) => {
+        const story = storyRef.current;
+        const rail = railRef.current;
+
+        if (event.button !== 0 || !story || !rail) {
+            return;
+        }
+
+        const { start, range } = storyScroll(story);
+
+        // The page moves under the pointer, and a browser link drag would
+        // otherwise start from whatever link has landed there.
+        event.preventDefault();
+        event.currentTarget.focus({ preventScroll: true });
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag.current = {
+            pointerY: event.clientY,
+            scroll: scrollY,
+            perPixel: range / rail.offsetHeight,
+            min: Math.min(scrollY, start),
+            max: Math.max(scrollY, start + range),
+        };
+        setDragging(true);
+    };
+
+    const moveDrag = (event: PointerEvent<HTMLDivElement>) => {
+        const active = drag.current;
+
+        if (!active) {
+            return;
+        }
+
+        const top =
+            active.scroll + (event.clientY - active.pointerY) * active.perPixel;
+
+        scrollTo({
+            top: Math.min(active.max, Math.max(active.min, top)),
+            behavior: 'instant',
+        });
+    };
+
+    const endDrag = () => {
+        drag.current = null;
+        setDragging(false);
+    };
+
+    const moveByKey = (event: KeyboardEvent<HTMLDivElement>) => {
+        const story = storyRef.current;
+        const step = KEY_STEPS[event.key];
+
+        if (
+            !story ||
+            (step === undefined && !['Home', 'End'].includes(event.key))
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const { start, range } = storyScroll(story);
+        const target =
+            step === undefined
+                ? Number(event.key === 'End')
+                : clamp((scrollY - start) / range + step);
+
+        scrollTo({ top: start + target * range, behavior: 'instant' });
+    };
 
     useEffect(() => {
         const story = storyRef.current;
@@ -92,6 +193,7 @@ export function StoryRail({
             );
 
             saveProgress(slug, progress);
+            setPercent(Math.round(progress * 100));
 
             if (!native || reduced.matches) {
                 rail.style.setProperty('--progress', progress.toFixed(4));
@@ -174,8 +276,24 @@ export function StoryRail({
                     </li>
                 ))}
             </ol>
-            <div className="story-rail-globe" aria-hidden="true">
-                <svg viewBox="0 0 32 32" fill="none">
+            <div
+                className="story-rail-globe"
+                role="slider"
+                tabIndex={0}
+                title="Drag to scroll the story"
+                aria-label="Reading position"
+                aria-orientation="vertical"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+                aria-valuetext={`${sections[current].name}, ${left}`}
+                data-dragging={dragging || undefined}
+                onPointerDown={startDrag}
+                onPointerMove={moveDrag}
+                onLostPointerCapture={endDrag}
+                onKeyDown={moveByKey}
+            >
+                <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
                     <circle
                         cx="16"
                         cy="16"
