@@ -2,6 +2,15 @@
     // Decided on the server so scrolling is locked from the first paint,
     // before React loads. The consent dialog removes the class on a choice.
     $consentRequired = (bool) data_get($page, 'props.consent.required', false);
+
+    // Link previews read the first HTML response and never run React, so the
+    // share tags are written here. Story pages use their own title and deck.
+    $storyTitle = data_get($page, 'props.story.title');
+    $ogTitle = $storyTitle ? $storyTitle.' · Meridian' : 'Meridian';
+    $ogDescription = data_get($page, 'props.story.deck')
+        ?: 'Independent journalism for Malaysia. The stories that shape the country, told with care.';
+    $ogType = $storyTitle ? 'article' : 'website';
+    $ogImage = asset('og.png');
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark', 'consent-locked' => $consentRequired])>
@@ -52,6 +61,21 @@
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+        <meta property="og:site_name" content="Meridian">
+        <meta property="og:type" content="{{ $ogType }}">
+        <meta property="og:title" content="{{ $ogTitle }}">
+        <meta property="og:description" content="{{ $ogDescription }}">
+        <meta property="og:url" content="{{ url()->current() }}">
+        <meta property="og:image" content="{{ $ogImage }}">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:image:alt" content="Meridian. The stories that shape Malaysia, told with care.">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{{ $ogTitle }}">
+        <meta name="twitter:description" content="{{ $ogDescription }}">
+        <meta name="twitter:image" content="{{ $ogImage }}">
 
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
