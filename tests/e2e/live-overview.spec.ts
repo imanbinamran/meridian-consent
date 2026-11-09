@@ -259,7 +259,7 @@ test.describe('with a real Reverb server', () => {
         'Needs Reverb and a queue worker, with BROADCAST_CONNECTION=reverb. Set E2E_REVERB=1 to run it.',
     );
 
-    test('ADM-055 an accept in one browser updates the overview in another', async ({
+    test('ADM-061 an accept in one browser updates the overview in another', async ({
         page,
         browser,
         baseURL,

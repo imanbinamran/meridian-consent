@@ -6,8 +6,11 @@ import {
     VISITOR_DEVICE,
     acceptAsNewVisitor,
     chooseStatus,
+    consentsList,
     consentsTable,
     dataRows,
+    guidSearch,
+    listRows,
     logInAsAdmin,
     searchGuid,
 } from './support/admin';
@@ -382,6 +385,139 @@ test.describe('as the admin', () => {
             expect(labels).toContain('Unknown');
             expect(total).toBeCloseTo(100, 5);
         }
+    });
+
+    for (const width of [375, 320] as const) {
+        test.describe(`on a ${width}px phone`, () => {
+            test.use({ viewport: { width, height: 812 }, hasTouch: true });
+
+            const { guid } = EXPIRED_CONSENT;
+
+            test('ADM-055 a row shows the whole record without sideways scrolling', async ({
+                page,
+            }) => {
+                await page.goto(`/admin/consents?search=${guid}`);
+
+                const list = consentsList(page);
+                await expect(listRows(page)).toHaveCount(1);
+                await expect(page.getByRole('table')).toBeHidden();
+
+                const row = listRows(page).first();
+                await expect(row).toContainText(guid);
+                await expect(row).toContainText('Expired');
+                await expect(row.locator('time')).toHaveText(
+                    '1 Jan 2025, 8:00 am',
+                );
+                await expect(row).toContainText(
+                    'v1 · Desktop · Chrome on Windows',
+                );
+
+                const box = await row.getByRole('link').boundingBox();
+                expect(box?.height).toBeGreaterThanOrEqual(44);
+
+                const { scrollWidth, clientWidth } = await list.evaluate(
+                    (element) => ({
+                        scrollWidth: element.scrollWidth,
+                        clientWidth: element.clientWidth,
+                    }),
+                );
+                expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+            });
+
+            test('ADM-055 tapping a row opens the record, with UTC as text', async ({
+                page,
+            }) => {
+                await page.goto(`/admin/consents?search=${guid}`);
+                await listRows(page).first().getByRole('link').tap();
+
+                await expect(page).toHaveURL(
+                    new RegExp(`/admin/consents/${guid}\\?search=${guid}$`),
+                );
+                await expect(
+                    page.getByRole('heading', { name: 'Consent record' }),
+                ).toBeVisible();
+                await expect(
+                    page.getByText('2025-01-01 00:00:00 UTC'),
+                ).toBeVisible();
+            });
+
+            test('ADM-055 the filter sheets change the rows and the URL', async ({
+                page,
+            }) => {
+                await page.goto('/admin/consents');
+                await expect(listRows(page).first()).toBeVisible();
+
+                await page.getByRole('button', { name: 'Status' }).tap();
+                await page
+                    .getByRole('dialog', { name: 'Status' })
+                    .getByRole('radio', { name: 'Expired' })
+                    .tap();
+
+                await expect(page).toHaveURL(/status=expired/);
+                await expect(page.getByRole('dialog')).toBeHidden();
+                await expect(listRows(page).first()).toContainText('Expired');
+                await expect(
+                    listRows(page).filter({ hasNotText: 'Expired' }),
+                ).toHaveCount(0);
+                await expect(
+                    page.getByRole('button', { name: 'Status: Expired' }),
+                ).toHaveText('Expired');
+
+                await page
+                    .getByRole('button', { name: 'Filters, 1 active' })
+                    .tap();
+                const sheet = page.getByRole('dialog', { name: 'Filters' });
+                await sheet.getByRole('radio', { name: 'Active' }).tap();
+                await sheet.getByRole('button', { name: 'Apply' }).tap();
+
+                await expect(page).toHaveURL(/status=active/);
+                await expect(listRows(page).first()).toContainText('Active');
+                await expect(
+                    listRows(page).filter({ hasNotText: 'Active' }),
+                ).toHaveCount(0);
+            });
+
+            test('ADM-055 sort changes the order', async ({ page }) => {
+                await page.goto('/admin/consents');
+                await expect(listRows(page).first()).not.toContainText(guid);
+
+                await page.getByRole('button', { name: /^Filters/ }).tap();
+                const sheet = page.getByRole('dialog', { name: 'Filters' });
+                await sheet.getByRole('radio', { name: 'Oldest first' }).tap();
+                await sheet.getByRole('button', { name: 'Apply' }).tap();
+
+                await expect(page).toHaveURL(/direction=asc/);
+                await expect(listRows(page).first()).toContainText(guid);
+            });
+
+            test('ADM-055 Reset leaves the empty state and clears the search', async ({
+                page,
+            }) => {
+                await page.goto('/admin/consents?search=no-such-guid');
+                await expect(
+                    page.getByText('No consents match these filters'),
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: 'Reset' }).tap();
+
+                await expect(page).not.toHaveURL(/search=/);
+                await expect(listRows(page).first()).toBeVisible();
+                await expect(guidSearch(page)).toHaveValue('');
+            });
+        });
+    }
+
+    test('ADM-055 the layout follows the content width, not the viewport', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1000, height: 800 });
+        await page.goto('/admin/consents');
+        await expect(consentsList(page)).toBeVisible();
+        await expect(page.getByRole('table')).toBeHidden();
+
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await expect(page.getByRole('table')).toBeVisible();
+        await expect(consentsList(page)).toBeHidden();
     });
 
     for (const colorScheme of ['light', 'dark'] as const) {

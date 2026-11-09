@@ -55,7 +55,7 @@ export default function ConsentShow({ timezone, backUrl, consent }: Props) {
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Consent record"
-                    description={`Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
+                    description={`Times are shown in Malaysia time (${timezone}), with UTC underneath.`}
                     actions={
                         <Button variant="outline" asChild>
                             <Link href={backUrl}>
@@ -155,6 +155,7 @@ export default function ConsentShow({ timezone, backUrl, consent }: Props) {
                                                 <LocalTime
                                                     iso={event.occurredAt}
                                                     timeZone={timezone}
+                                                    showUtc
                                                 />
                                                 <Badge
                                                     variant="outline"

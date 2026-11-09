@@ -13,7 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { POPOVER_MOTION } from './motion';
 
-const DAY = 'yyyy-MM-dd';
+export const DAY = 'yyyy-MM-dd';
 
 type Value = { from?: string; to?: string };
 
@@ -24,7 +24,7 @@ type Props = {
     className?: string;
 };
 
-function toDate(day?: string): Date | undefined {
+export function toDate(day?: string): Date | undefined {
     if (!day) {
         return undefined;
     }
@@ -34,7 +34,7 @@ function toDate(day?: string): Date | undefined {
     return isValid(date) ? date : undefined;
 }
 
-function label({ from, to }: Value): string {
+export function dateRangeLabel({ from, to }: Value): string {
     const start = toDate(from);
     const end = toDate(to);
 
@@ -97,7 +97,7 @@ export function DateRangePicker({ id, value, onChange, className }: Props) {
                         )}
                     >
                         <CalendarDays aria-hidden />
-                        {label(value)}
+                        {dateRangeLabel(value)}
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent

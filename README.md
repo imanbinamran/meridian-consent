@@ -22,7 +22,7 @@
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="MySQL 8.4" src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white">
   <img alt="Pest: 284 tests" src="https://img.shields.io/badge/Pest-284%20tests-F28D1A">
-  <img alt="Playwright: 137 tests" src="https://img.shields.io/badge/Playwright-137%20tests-2EAD33">
+  <img alt="Playwright: 148 tests" src="https://img.shields.io/badge/Playwright-148%20tests-2EAD33">
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ Every case ID below is written up in [`tests/cases/`](tests/cases), with the bri
     - the database check that stops forged cookies
     - HttpOnly on both cookies
     - five readable sample stories at `/stories/{slug}`, behind the same consent gate (STR-001 to STR-022)
-    - a live admin overview over Laravel Reverb, off until it's switched on (ADM-055 to ADM-060)
+    - a live admin overview over Laravel Reverb, off until it's switched on (ADM-056 to ADM-061)
 
 ## See it work
 
@@ -255,7 +255,7 @@ The table badge, the record page, the status filter and the CSV all use the same
 Last full run on 9 Nov 2026: every test below passed, apart from the one real-Reverb test that is skipped by default.
 
 - **Pest:** 284 tests (2,004 assertions) cover every consent rule, the admin portal, live updates and the stories. Time travel checks the 1-year and 1-day expiry.
-- **Playwright:** 137 tests cover consent, scroll lock, accessibility (axe), phone layout, the article pages, the live overview and the admin in desktop Chrome. The consent, phone-layout and article tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
+- **Playwright:** 148 tests cover consent, scroll lock, accessibility (axe), phone layout, the article pages, the live overview and the admin in desktop Chrome. The consent, phone-layout and article tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
 - **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
 

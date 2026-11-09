@@ -38,6 +38,15 @@ export function dataRows(table: Locator): Locator {
         .filter({ has: table.page().getByRole('cell') });
 }
 
+/** The one-column list that replaces the table on narrow screens. */
+export function consentsList(page: Page): Locator {
+    return page.getByRole('list', { name: 'Consents' });
+}
+
+export function listRows(page: Page): Locator {
+    return consentsList(page).getByRole('listitem');
+}
+
 export async function searchGuid(page: Page, guid: string): Promise<void> {
     await guidSearch(page).fill(guid);
     await guidSearch(page).press('Enter');
