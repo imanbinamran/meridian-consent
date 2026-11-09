@@ -1979,3 +1979,36 @@ cases:
       cleanup: 'none needed'
       tags: [e2e]
       notes: 'admin.spec.ts.'
+
+    - id: ADM-072
+      title: The live badge says Disconnected when the socket service refuses the channel
+      type: web
+      scenario_class: flow
+      priority: P2
+      technique: fault_injection
+      required: false
+      mutates: none
+      role: admin
+      preconditions:
+          ['Logged in as admin', 'Live updates on, with a fake socket']
+      steps:
+          - Open /admin while the service answers the channel subscribe with an error
+          - Open /admin with a working socket, then have the service send an error after the badge says Live
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Refused channel,
+                expected: 'The badge says Disconnected, not Connecting, and the numbers stay on the page',
+                provenance: 'Production, 9 Nov 2026: a wrong Pusher secret left the badge on Connecting while Pusher answered Invalid signature',
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Error after subscribing,
+                expected: 'The badge stays Live',
+                provenance: 'The channel is still subscribed, so the numbers are still live',
+            }
+      cleanup: 'none needed'
+      tags: [e2e]
+      notes: 'live-overview.spec.ts.'

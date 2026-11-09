@@ -107,6 +107,7 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
                       });
 
             let subscribedBefore = false;
+            let waitingForChannel = true;
 
             closeSocket = () => echo.disconnect();
 
@@ -115,6 +116,7 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
                 ({ current }: { current: string }) => {
                     // Live waits for the channel below, not just the socket.
                     if (!unmounted && current !== 'connected') {
+                        waitingForChannel = true;
                         setStatus(
                             current === 'connecting' && !subscribedBefore
                                 ? 'connecting'
@@ -124,8 +126,24 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
                 },
             );
 
+            // A refused channel, such as a bad signature, arrives as an error
+            // on the socket and the socket stays open. Nothing else reports it.
+            echo.connector.pusher.connection.bind(
+                'error',
+                ({ type }: { type?: string }) => {
+                    if (
+                        !unmounted &&
+                        waitingForChannel &&
+                        type === 'PusherError'
+                    ) {
+                        setStatus('disconnected');
+                    }
+                },
+            );
+
             echo.private(channelName)
                 .subscribed(() => {
+                    waitingForChannel = false;
                     setStatus('live');
 
                     // Anything that changed during the gap was never announced.
