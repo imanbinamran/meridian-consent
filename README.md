@@ -26,13 +26,14 @@
 </p>
 
 <p align="center">
-  <a href="#required-vs-bonus">Required vs bonus</a> ·
-  <a href="#see-it-work">See it work</a> ·
-  <a href="#try-to-break-it">Try to break it</a> ·
+  <a href="#review-it-in-5-minutes">5-minute review</a> ·
+  <a href="#the-brief-line-by-line">The brief</a> ·
   <a href="#run-it-locally">Run it locally</a> ·
-  <a href="#how-the-consent-works">How it works</a> ·
-  <a href="#decisions-and-trade-offs">Decisions</a> ·
-  <a href="#tests">Tests</a>
+  <a href="#read-the-code">Read the code</a> ·
+  <a href="#try-to-break-it">Try to break it</a> ·
+  <a href="#decisions-and-known-limits">Decisions and limits</a> ·
+  <a href="#beyond-the-brief">Beyond the brief</a> ·
+  <a href="#go-deeper">Go deeper</a>
 </p>
 
 <p align="center">
@@ -42,78 +43,49 @@
   </picture>
 </p>
 
-Sign in to the admin with `admin@meridian.test` and the password I'm sharing separately. It's hosted on Laravel Cloud in Singapore, with MySQL 8.4.
+## Review it in 5 minutes
 
-## The brief, line by line
+All 8 requirements, the bonus admin portal and the deliverables are in this repo. Extras are marked, so you can skip them.
 
-Every case ID below is written up in [`tests/cases/`](tests/cases), with the brief rule it proves.
+Use a private window on the [live site](https://meridian-production-gohs21.laravel.cloud). Cookies are in DevTools, under Application, then Cookies.
 
-| Brief                                                                          | Where it lives                                                                                                                                                                       | Proved by                                                     |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 4 pages, mobile friendly                                                       | `/`, `/about`, `/privacy`, `/terms`. Checked from 320px up, light and dark, and right to left.                                                                                       | CON-001, CON-002, CON-003                                     |
-| Consent box on first visit, page can't scroll                                  | The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                                                                             | CON-010, CON-020, CON-022                                     |
-| Exact copy, with links to Terms and Privacy                                    | `resources/js/components/site/consent/consent-dialog.tsx`                                                                                                                            | CON-011, CON-012                                              |
-| Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | `consent` cookie plus a row in `consents`                                                                                                                                            | CON-030, CON-031, CON-032                                     |
-| Box stays away until the cookie expires or is gone                             | Checked on the server on every page, and against the database                                                                                                                        | CON-033, CON-040, CON-041, CON-072                            |
-| Decline: cookie with the time, lasts 1 day                                     | `consent_declined` cookie                                                                                                                                                            | CON-050, CON-051, CON-052                                     |
-| Bonus: secured admin portal                                                    | `/admin`: overview, 30-day chart, consent health, accept rate, renewals due, device, browser and OS breakdowns, searchable table with a status filter, a page per record, CSV export | ADM-002, ADM-020, ADM-030, ADM-040, ADM-043, ADM-045, ADM-049 |
-| Database scripts                                                               | `database/migrations`, plus `database/schema.sql` as plain SQL                                                                                                                       | Pest runs on MySQL 8.4 in CI                                  |
+| #   | Do this                                                   | You should see                                                                                                | Brief   |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | Open the site. Try to scroll, then press Esc.             | The consent box is open. The page doesn't move and the box stays.                                             | 3, 4    |
+| 2   | Click Accept.                                             | The box closes and the page scrolls. The `consent` cookie holds a GUID, the time and version 1, for 1 year. Copy the GUID. | 6       |
+| 3   | Reload, then open About.                                  | No box.                                                                                                       | 7       |
+| 4   | Delete `consent`, reload, then click Decline.             | The box comes back, then closes. `consent_declined` holds the time, for 1 day.                                | 7, 8    |
+| 5   | Delete `consent_declined` and reload.                     | The box comes back.                                                                                           | 8       |
+| 6   | Open the [admin portal](https://meridian-production-gohs21.laravel.cloud/admin), sign in, and search the GUID. | One matching row, Active.                                                  | Bonus   |
 
-## Required vs bonus
+Sign in with `admin@meridian.test` and the password I sent with this submission. It's hosted on Laravel Cloud in Singapore, with MySQL 8.4. The same route works on [a local copy](#run-it-locally), where the password is `password`.
 
-- **Required by the brief:** the four pages, the consent box, the exact copy, the Accept and Decline cookies, the database row and the database scripts.
-- **Bonus in the brief:** the secured admin portal.
-- **Extras I added beyond the brief:**
-    - event history for each consent, shown on its own page in the admin
-    - withdrawal, when someone declines after accepting
-    - coarse device data, kept on accept only
-    - browser and device breakdowns on the overview
-    - the database check that stops forged cookies
-    - HttpOnly on both cookies
-    - five readable sample stories at `/stories/{slug}`, behind the same consent gate (STR-001 to STR-022)
-    - a live admin overview over free Pusher or Laravel Reverb, off until it's switched on (ADM-056 to ADM-067)
-
-## See it work
-
-One visitor, one session, from the first page load to the admin table. Every frame is a Playwright capture of a local run.
+The same route, recorded. Every frame is a Playwright capture of a local run.
 
 <p align="center">
   <img src="docs/readme/story.gif" alt="Five steps: the consent box opens and the page won't scroll, Accept frees the page, the server sets a cookie with a GUID, the admin logs in, and searching that GUID finds one matching row" width="100%">
 </p>
 
-The admin overview, with seeded demo data:
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/admin-overview-dark.png">
-    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, consent health, weekly accept rate, renewals due, and who accepted by device, browser and OS" width="100%">
-  </picture>
-</p>
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Try to break it
+## The brief, line by line
 
-I ran each of these on a local copy on 9 Nov 2026. To edit a cookie, open DevTools, then Application, then Cookies.
+Numbers match the PDF. Every case ID links to its write-up in [`tests/cases/`](tests/cases), with the brief rule it proves.
 
-| Try this                                                                             | What happens                                                          |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Scroll with the box open                                                             | The page stays at 0px.                                                |
-| Press Esc, or click outside the box                                                  | The box stays open.                                                   |
-| Press Tab over and over                                                              | Focus stays on the box's two links and two buttons.                   |
-| Load a page with JavaScript off                                                      | `<html>` already has the `consent-locked` class and scrolling is off. |
-| Change the year in `accepted_at` to 2099                                             | The box comes back.                                                   |
-| Set the date to over a year ago                                                      | The box comes back.                                                   |
-| Change the GUID to `not-a-guid`                                                      | The box comes back.                                                   |
-| Keep a real GUID but move `accepted_at` back an hour                                 | The box comes back.                                                   |
-| Forge a cookie with a valid GUID and no row                                          | The box comes back.                                                   |
-| Accept, decline, then restore the old `consent` cookie and delete `consent_declined` | The box comes back.                                                   |
-| Replace the whole value with `hello`                                                 | The box comes back.                                                   |
-| Run locally with `CONSENT_VERSION=2` and a v1 cookie                                 | The box comes back.                                                   |
-| Accept, reopen with "Cookie settings", accept again                                  | Same GUID, still one row.                                             |
-| Type a fresh time into `consent_declined` by hand                                    | The box stays away for up to a day. Declines have no row to check.    |
-| Open `/admin` signed out                                                             | You land on the login page.                                           |
-| Open `/register`                                                                     | 404. Nobody can sign up.                                              |
+| #   | The brief asks for                                      | How to check it                                                                                                                                                                       | Code                                                                                                                                                     | Proved by                                                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 4 pages                                                 | Open `/`, `/about`, `/privacy` and `/terms`.                                                                                                                                          | [`routes/web.php`](routes/web.php#L14), [`pages/site/`](resources/js/pages/site)                                                                         | [CON-001](tests/cases/consent.yaml#L221)                                                                                                                                                                                                                                                                                          |
+| 2   | Mobile friendly                                         | Narrow the window. Nothing scrolls sideways, and the box becomes a bottom sheet. Checked from 320px up, light and dark, and right to left.                                            | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                                                          | [CON-002](tests/cases/consent.yaml#L253), [CON-003](tests/cases/consent.yaml#L287)                                                                                                                                                                                                                                                |
+| 3   | Consent box on first visit, page can't scroll           | Open any page in a private window. The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                                           | [`app.blade.php`](resources/views/app.blade.php#L45), [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L49)                                 | [CON-010](tests/cases/consent.yaml#L347), [CON-020](tests/cases/consent.yaml#L444), [CON-022](tests/cases/consent.yaml#L510)                                                                                                                                                                                                      |
+| 4   | The exact consent copy                                  | Compare the box with the PDF, word for word.                                                                                                                                          | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                                                          | [CON-011](tests/cases/consent.yaml#L372)                                                                                                                                                                                                                                                                                          |
+| 5   | Links to Terms and Privacy                              | Click both links in the box.                                                                                                                                                          | [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx)                                                                          | [CON-012](tests/cases/consent.yaml#L403)                                                                                                                                                                                                                                                                                          |
+| 6   | Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | Click Accept and read the `consent` cookie. Find its GUID in the admin.                                                                                        | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L69), [`schema.sql`](database/schema.sql)                                                  | [CON-030](tests/cases/consent.yaml#L551), [CON-031](tests/cases/consent.yaml#L605), [CON-032](tests/cases/consent.yaml#L638)                                                                                                                                                                                                      |
+| 7   | Box stays away until the cookie expires or is gone      | Reload and change page. Then delete the cookie and reload. It's checked on the server on every page, and against the database.                                                        | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L170)                                                                                      | [CON-033](tests/cases/consent.yaml#L670), [CON-040](tests/cases/consent.yaml#L781), [CON-041](tests/cases/consent.yaml#L809), [CON-072](tests/cases/consent.yaml#L1158)                                                                                                                                                           |
+| 8   | Decline: cookie with the time, lasts 1 day, box returns | Click Decline and read `consent_declined`. Delete it and reload.                                                                                                                      | [`ConsentManager.php`](app/Support/Consent/ConsentManager.php#L107)                                                                                      | [CON-050](tests/cases/consent.yaml#L911), [CON-051](tests/cases/consent.yaml#L958), [CON-052](tests/cases/consent.yaml#L992)                                                                                                                                                                                                      |
+| Bonus | Secured admin portal                                  | `/admin`: overview, 30-day chart, consent health, accept rate, renewals due, device, browser and OS breakdowns, searchable table with a status filter, a page per record, CSV export. | [`Admin/ConsentController.php`](app/Http/Controllers/Admin/ConsentController.php), [`pages/admin/`](resources/js/pages/admin)                            | [ADM-002](tests/cases/admin.yaml#L272), [ADM-020](tests/cases/admin.yaml#L488), [ADM-030](tests/cases/admin.yaml#L654), [ADM-040](tests/cases/admin.yaml#L751), [ADM-043](tests/cases/admin.yaml#L865), [ADM-045](tests/cases/admin.yaml#L946), [ADM-049](tests/cases/admin.yaml#L1104)                                          |
+| Stack | PHP 7 or 8 with MySQL                                 | Laravel 13 on PHP 8.3+, with MySQL 8.4.                                                                                                                                               | [`composer.json`](composer.json)                                                                                                                         | Pest runs on MySQL 8.4 in CI                                                                                                                                                                                                                                                                                                      |
+| Deliverable | Source code and database scripts                | This repo. The scripts are `database/migrations`, plus `database/schema.sql` as plain SQL.                                                                                            | [`database/`](database)                                                                                                                                  | Pest runs on MySQL 8.4 in CI                                                                                                                                                                                                                                                                                                      |
+| Deliverable | README with local setup                         | [Run it locally](#run-it-locally), below.                                                                                                                                             |                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                   |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -133,20 +105,119 @@ If your MySQL user isn't `root` with no password, set `DB_USERNAME` and `DB_PASS
 
 Log in at http://localhost:8000/login with `admin@meridian.test` / `password`.
 
-### Live overview
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-The admin overview updates by itself when someone accepts, declines or withdraws. A green **Live** badge next to the title says it's on. If the connection drops the badge reads **Disconnected**, and the numbers stay until it comes back. It reconnects by itself and catches up.
+## Read the code
 
-It's off by default, so the app runs without it. It can run on free Pusher or on Reverb, and `BROADCAST_CONNECTION` in `.env` picks which. Either way you need a queue worker, because the app sends each update from the queue. `composer dev` starts one.
+Five files carry the consent logic. Read them in this order.
 
-- **Pusher:** nothing to host, and the free plan is enough. Create a Channels app, then set `BROADCAST_CONNECTION=pusher`, `PUSHER_APP_ID`, `PUSHER_APP_KEY`, `PUSHER_APP_SECRET` and `PUSHER_APP_CLUSTER`.
-- **Reverb:** you run the socket server yourself. Set `BROADCAST_CONNECTION=reverb`. `composer dev` starts Reverb on your own machine, and the Reverb values in `.env.example` work there. If something else is on port 8080, set `REVERB_PORT` and `REVERB_SERVER_PORT` to a free one. On a server you need Reverb running too.
+1. [`ConsentManager.php`](app/Support/Consent/ConsentManager.php). Start here. [`state()`](app/Support/Consent/ConsentManager.php#L49) decides if the box shows, and [`verifiedAccepted()`](app/Support/Consent/ConsentManager.php#L170) checks a cookie against the database.
+2. [`ConsentController.php`](app/Http/Controllers/ConsentController.php). The Accept and Decline endpoints, and the cookies they set.
+3. [`app.blade.php`](resources/views/app.blade.php#L45). The scroll lock, in the first HTML.
+4. [`consent-dialog.tsx`](resources/js/components/site/consent/consent-dialog.tsx). The box, its exact copy and its two buttons.
+5. [`config/consent.php`](config/consent.php). The version, cookie names, lifetimes and rate limit.
 
-If a setting is missing, the page shows no badge and the app queues nothing for it.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-The stats, chart and recent list are live. The browser and device breakdowns refresh on page load.
+## Try to break it
 
-## How the consent works
+I ran each of these on a local copy on 9 Nov 2026. To edit a cookie, open DevTools, then Application, then Cookies.
+
+| Try this                                                                             | What happens                                                          |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Press Esc, or click outside the box                                                  | The box stays open.                                                   |
+| Load a page with JavaScript off                                                      | `<html>` already has the `consent-locked` class and scrolling is off. |
+| Change the year in `accepted_at` to 2099                                             | The box comes back.                                                   |
+| Forge a cookie with a valid GUID and no row                                          | The box comes back.                                                   |
+| Accept, decline, then restore the old `consent` cookie and delete `consent_declined` | The box comes back.                                                   |
+| Type a fresh time into `consent_declined` by hand                                    | The box stays away for up to a day. Declines have no row to check.    |
+
+<details>
+<summary>10 more ways to try</summary>
+
+| Try this                                             | What happens                                        |
+| ---------------------------------------------------- | --------------------------------------------------- |
+| Scroll with the box open                             | The page stays at 0px.                              |
+| Press Tab over and over                              | Focus stays on the box's two links and two buttons. |
+| Set the date to over a year ago                      | The box comes back.                                 |
+| Change the GUID to `not-a-guid`                      | The box comes back.                                 |
+| Keep a real GUID but move `accepted_at` back an hour | The box comes back.                                 |
+| Replace the whole value with `hello`                 | The box comes back.                                 |
+| Run locally with `CONSENT_VERSION=2` and a v1 cookie | The box comes back.                                 |
+| Accept, reopen with "Cookie settings", accept again  | Same GUID, still one row.                           |
+| Open `/admin` signed out                             | You land on the login page.                         |
+| Open `/register`                                     | 404. Nobody can sign up.                            |
+
+</details>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Decisions and known limits
+
+The five that shaped the build:
+
+- **The server owns the decision.** The browser never creates consent cookies. The GUID, time and version come from the server. A cookie the browser sends back counts only if a live row agrees with it, and what gets stored comes from the server or that row. This keeps the cookie and the database row in step.
+- **Accepting twice makes one row.** The buttons turn off while a choice is saving. After that, accepting with a verified cookie keeps its GUID and writes nothing.
+- **The decline count holds no ID.** The brief only asks for a cookie on decline. I also store a count (version and time only, no GUID, no IP), so the admin can see the accept rate.
+- **The version stays 1,** as the brief says. On a live product, adding device data would be a reason to raise it and ask everyone again.
+- **No preference centre.** The site sets no optional cookies, so toggles would control nothing. The brief also fixes the choice as Accept and Decline.
+
+What it doesn't do yet:
+
+- **A copied cookie still works.** A real, live cookie moved to another browser passes, because the GUID is the only proof.
+- **A hand-typed decline hides the box for up to a day.** Declines are anonymous, so there's no row to check. It records no consent.
+- **A database outage is a 500.** Sessions live in the database, so pages fail first. The fallbacks only help on another session driver, and a failed Decline is a 500 on any driver.
+- **Sessions still store IP and user agent.** That's Laravel's database session driver, for every visitor, including people who decline. The consent records hold neither.
+- **Any verified user is an admin.** That's safe only because registration is off.
+- **Phone checks ran in emulation.** Not on a real iPhone or Android yet.
+
+<details>
+<summary>The other decisions</summary>
+
+- **A withdrawal isn't a decline in the count.** That person already has a record, so the record changes and the anonymous decline count doesn't.
+- **Device data is three coarse fields:** device type, browser family and OS family. The server works them out on accept only. The raw user agent is never kept in the consent records. The breakdowns cover accepted visitors only, because declines carry no device data. iPadOS can report as macOS Desktop, so some iPads count as Macs.
+- **Database outage.** On a page view, if the row lookup fails, a cookie that passes the format checks is trusted, so readers aren't locked out. Accept never does this. If the database can't answer, the visitor gets an error message, no cookie is set and nothing is called saved. Decline has no such handling yet, so a failed Decline is a 500. To be honest about how far the page view fallback goes: with `SESSION_DRIVER=database`, which is what this app uses, the page returns 500 anyway because sessions fail first. I tried both drivers with the database down. The fallback and the Accept message only help on another session driver.
+- **Sessions still store IP and user agent.** Laravel's database session driver writes the raw IP and user agent to the `sessions` table for every visitor, including people who decline. That table is separate from the consent records, which don't hold either value, and the Privacy Statement says so. The fix is to move to a different session driver, such as Redis or cookies.
+- **Times are stored in UTC and shown in Malaysia time.** The admin's date filters and chart use Kuala Lumpur days, so picking 12 Oct means 12 Oct as the admin sees it.
+- **The admin can't be signed up for.** Registration is turned off. Login is rate limited to 5 tries a minute, and 2FA and passkeys are available in settings.
+- **Accept and decline are rate limited** at 30 a minute per IP (`CONSENT_THROTTLE`).
+- **Live updates can't hurt a visitor.** With live updates on, saving a choice only adds a job to the queue. With them off, nothing is queued. A worker talks to Pusher or Reverb, so an accept never waits on a socket server that's down, and a failure to queue is logged and ignored. The message says only "something changed". It carries no GUID, IP or device data, and the page then asks for the new numbers behind the admin login. A double click, a retry or a repeat decline changes nothing, so it sends nothing.
+- **Ready for right-to-left.** Layouts use logical properties, so a Jawi or Arabic edition would mirror correctly. I tested it with `dir="rtl"`.
+
+</details>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Beyond the brief
+
+You don't need any of this to mark the brief. It's here so you can tell what was asked for from what I added.
+
+- event history for each consent, shown on its own page in the admin
+- withdrawal, when someone declines after accepting
+- coarse device data, kept on accept only
+- browser and device breakdowns on the overview
+- the database check that stops forged cookies
+- HttpOnly on both cookies
+- five readable sample stories at `/stories/{slug}`, behind the same consent gate ([STR-001](tests/cases/stories.yaml#L165) to [STR-022](tests/cases/stories.yaml#L683))
+- a live admin overview over free Pusher or Laravel Reverb, off until it's switched on ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
+
+The admin overview, with seeded demo data:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/admin-overview-dark.png">
+    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, consent health, weekly accept rate, renewals due, and who accepted by device, browser and OS" width="100%">
+  </picture>
+</p>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Go deeper
+
+Open these only if you want the detail.
+
+<details>
+<summary><strong>How the consent works</strong></summary>
 
 How the parts connect:
 
@@ -218,8 +289,6 @@ The `consent` value is URL-encoded in transit because it contains commas. Tick "
 
 So a hand-edited `consent` cookie can't hide the box while the database is up.
 
-Two limits. A real, live cookie copied to another browser still works, because the GUID is the only proof. And a hand-typed `consent_declined` can hide the box for up to a day. Declines are anonymous, so there's no row to check. It records no consent.
-
 **Changing your mind.** Declining while holding an acceptance that matches its row marks that record withdrawn and writes an event. This works for a cookie from an older notice too. The `consent` cookie is cleared, and putting it back doesn't help because the row is no longer live. Declining again with that old cookie adds nothing. Accepting later issues a new GUID and a new row.
 
 **Status in the admin.** Each record is one of three things, worked out when it's read:
@@ -236,26 +305,10 @@ The table badge, the record page, the status filter and the CSV all use the same
 
 **The box itself.** It's an accessible alert dialog. Esc and clicking outside don't close it on a first visit. Accept and Decline look the same, so neither is pushed. On phones it's a bottom sheet. "Cookie settings" in the footer reopens it, so a visitor can change their mind.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+</details>
 
-## Decisions and trade-offs
-
-- **The server owns the decision.** The browser never creates consent cookies. The GUID, time and version come from the server. A cookie the browser sends back counts only if a live row agrees with it, and what gets stored comes from the server or that row. This keeps the cookie and the database row in step.
-- **Accepting twice makes one row.** The buttons turn off while a choice is saving. After that, accepting with a verified cookie keeps its GUID and writes nothing.
-- **The decline count holds no ID.** The brief only asks for a cookie on decline. I also store a count (version and time only, no GUID, no IP), so the admin can see the accept rate. The session record below still exists for people who decline.
-- **A withdrawal isn't a decline in the count.** That person already has a record, so the record changes and the anonymous decline count doesn't.
-- **The version stays 1,** as the brief says. On a live product, adding device data would be a reason to raise it and ask everyone again.
-- **No preference centre.** The site sets no optional cookies, so toggles would control nothing. The brief also fixes the choice as Accept and Decline.
-- **Device data is three coarse fields:** device type, browser family and OS family. The server works them out on accept only. The raw user agent is never kept in the consent records. The breakdowns cover accepted visitors only, because declines carry no device data. iPadOS can report as macOS Desktop, so some iPads count as Macs.
-- **Database outage.** On a page view, if the row lookup fails, a cookie that passes the format checks is trusted, so readers aren't locked out. Accept never does this. If the database can't answer, the visitor gets an error message, no cookie is set and nothing is called saved. Decline has no such handling yet, so a failed Decline is a 500. To be honest about how far the page view fallback goes: with `SESSION_DRIVER=database`, which is what this app uses, the page returns 500 anyway because sessions fail first. I tried both drivers with the database down. The fallback and the Accept message only help on another session driver.
-- **Sessions still store IP and user agent.** Laravel's database session driver writes the raw IP and user agent to the `sessions` table for every visitor, including people who decline. That table is separate from the consent records, which don't hold either value, and the Privacy Statement says so. The fix is to move to a different session driver, such as Redis or cookies.
-- **Times are stored in UTC and shown in Malaysia time.** The admin's date filters and chart use Kuala Lumpur days, so picking 12 Oct means 12 Oct as the admin sees it.
-- **The admin can't be signed up for.** Registration is turned off. Login is rate limited to 5 tries a minute, and 2FA and passkeys are available in settings.
-- **Accept and decline are rate limited** at 30 a minute per IP (`CONSENT_THROTTLE`).
-- **Live updates can't hurt a visitor.** With live updates on, saving a choice only adds a job to the queue. With them off, nothing is queued. A worker talks to Pusher or Reverb, so an accept never waits on a socket server that's down, and a failure to queue is logged and ignored. The message says only "something changed". It carries no GUID, IP or device data, and the page then asks for the new numbers behind the admin login. A double click, a retry or a repeat decline changes nothing, so it sends nothing.
-- **Ready for right-to-left.** Layouts use logical properties, so a Jawi or Arabic edition would mirror correctly. I tested it with `dir="rtl"`.
-
-## Tests
+<details>
+<summary><strong>Tests</strong></summary>
 
 Last full run on 9 Nov 2026: every test below passed, apart from the two real-server tests that are skipped by default.
 
@@ -272,9 +325,26 @@ pnpm test:e2e                                     # Playwright (starts the app i
 
 The live overview tests use a fake socket, so neither CI nor your machine needs Reverb or a Pusher account. Two tests use a real server across two browsers, and both are skipped by default. One needs the app on Reverb and `E2E_REVERB=1`. The other needs the `pusher` connection pointed at a local Reverb through `PUSHER_HOST`, `PUSHER_PORT` and `PUSHER_SCHEME`, and `E2E_PUSHER_LOCAL=1`.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+</details>
 
-## Where things are
+<details>
+<summary><strong>Live overview setup</strong></summary>
+
+The admin overview updates by itself when someone accepts, declines or withdraws. A green **Live** badge next to the title says it's on. If the connection drops the badge reads **Disconnected**, and the numbers stay until it comes back. It reconnects by itself and catches up.
+
+It's off by default, so the app runs without it. It can run on free Pusher or on Reverb, and `BROADCAST_CONNECTION` in `.env` picks which. Either way you need a queue worker, because the app sends each update from the queue. `composer dev` starts one.
+
+- **Pusher:** nothing to host, and the free plan is enough. Create a Channels app, then set `BROADCAST_CONNECTION=pusher`, `PUSHER_APP_ID`, `PUSHER_APP_KEY`, `PUSHER_APP_SECRET` and `PUSHER_APP_CLUSTER`.
+- **Reverb:** you run the socket server yourself. Set `BROADCAST_CONNECTION=reverb`. `composer dev` starts Reverb on your own machine, and the Reverb values in `.env.example` work there. If something else is on port 8080, set `REVERB_PORT` and `REVERB_SERVER_PORT` to a free one. On a server you need Reverb running too.
+
+If a setting is missing, the page shows no badge and the app queues nothing for it.
+
+The stats, chart and recent list are live. The browser and device breakdowns refresh on page load.
+
+</details>
+
+<details>
+<summary><strong>Where things are</strong></summary>
 
 ```
 app/Support/Consent/        checking cookies against the database, withdrawals, device parsing
@@ -289,6 +359,8 @@ database/schema.sql         the schema as plain SQL
 tests/Feature/              Pest
 tests/e2e/                  Playwright
 ```
+
+</details>
 
 ## What I'd add next
 
