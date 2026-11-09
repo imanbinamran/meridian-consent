@@ -26,6 +26,11 @@ sources:
           kind: code,
           ref: 'resources/js/pages/auth/login.tsx (field labels), config/fortify.php',
       }
+    - {
+          id: S4,
+          kind: chat,
+          ref: 'Brief to show consent records in the admin portal (status, device, record detail, CSV columns, overview breakdowns)',
+      }
 
 requirements:
     - id: REQ-1
@@ -69,7 +74,7 @@ requirements:
       anchor: 'S2 pagination 25'
       risk: { impact: 2, likelihood: 2 }
     - id: REQ-11
-      text: /admin/consents/export downloads a CSV with header guid,version,accepted_at_utc that honours the active filters
+      text: /admin/consents/export downloads a CSV whose header starts guid,version,accepted_at_utc and that honours the active filters
       anchor: 'S2 CSV export honouring filters'
       risk: { impact: 2, likelihood: 2 }
     - id: REQ-12
@@ -81,11 +86,37 @@ requirements:
       anchor: 'S1 accept stored in database + admin views acceptances'
       risk: { impact: 3, likelihood: 2 }
 
+    - id: REQ-14
+      text: Each consents table row shows a Status badge (Active or Withdrawn) and a Device summary, with Unknown where nothing was recorded
+      anchor: 'S4 status badge and device column'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-15
+      text: The consents table filters by status, kept in the URL and pagination like the other filters
+      anchor: 'S4 filter by status'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-16
+      text: Each row links to a record page behind admin auth showing GUID, status, version, device, browser, OS and the event history oldest first in Malaysia time, without N+1 on the table
+      anchor: 'S4 record detail'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-17
+      text: The CSV export appends status, withdrawn_at, device_type, browser_family and os_family after the existing columns and honours the filters
+      anchor: 'S4 CSV export'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-18
+      text: The overview shows a withdrawn count and browser and device breakdowns for accepted consents in the 30-day window, labelled accepted visitors only, with Unknown as a bucket and percentages totalling 100; the accept rate formula is unchanged
+      anchor: 'S4 overview'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-19
+      text: The consent records UI works at 320px and desktop widths in light and dark mode
+      anchor: 'S4 UI check'
+      risk: { impact: 2, likelihood: 2 }
+
 scope:
     in:
         - Login, logout-free access control for /admin, /admin/consents and the export
         - Overview stats and chart
         - Consents table search, filters, pagination and CSV export
+        - Consent status, device details, record page and overview breakdowns
     out:
         - {
               item: 'Password reset, email verification, 2FA, passkeys',
@@ -118,6 +149,10 @@ fixtures:
     - id: F3
       text: 'Two fresh acceptances made through the public site in separate browser contexts during the e2e test'
       setup: 'Open / in a new context and click Accept, twice'
+      cleanup: 'none needed: CI database is thrown away; locally they are harmless test rows'
+    - id: F4
+      text: 'Fresh visitors made through the public site during the e2e test with a fixed Desktop Chrome on Windows user agent: one accepts, one accepts then declines through Cookie settings'
+      setup: 'Open / in a new context and click Accept, then Cookie settings and Decline for the withdrawn visitor'
       cleanup: 'none needed: CI database is thrown away; locally they are harmless test rows'
 
 assumptions:
@@ -568,7 +603,7 @@ cases:
                 id: A1,
                 kind: ui,
                 description: Header,
-                expected: "First line of the file is exactly 'guid,version,accepted_at_utc'",
+                expected: "First line of the file is exactly 'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family'",
                 provenance: REQ-11,
             }
           - {
@@ -688,3 +723,480 @@ cases:
       cleanup: 'none needed: see Fixture F3'
       tags: [e2e, smoke]
       notes: 'proof.spec.ts. The single test that ties cookie, database and admin view together.'
+
+    # ---------- consent records: status, device, history ----------
+    - id: ADM-041
+      title: Each row shows a status badge and a device summary
+      type: hybrid
+      scenario_class: render
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-14]
+      role: admin
+      preconditions: [Fixture F1, Fixture F4, 'Logged in as admin']
+      steps:
+          - Open /admin/consents and search for the active F4 GUID
+          - Search for the withdrawn F4 GUID
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Columns,
+                expected: "The table has 'Status' and 'Device' column headers",
+                provenance: REQ-14,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Active row,
+                expected: "The active GUID row reads 'Active' and 'Desktop · Chrome on Windows'",
+                provenance: REQ-14,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Withdrawn row,
+                expected: "The withdrawn GUID row reads 'Withdrawn'",
+                provenance: REQ-14,
+            }
+      cleanup: 'none needed: see Fixture F4'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: ConsentIndexTest.'
+
+    - id: ADM-042
+      title: Rows from before device details were kept read Unknown
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-14]
+      role: admin
+      preconditions:
+          [
+              'A consent with null device_type, browser_family and os_family',
+              'Logged in as admin',
+          ]
+      steps:
+          - GET /admin/consents
+          - GET the record page for that GUID
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Unknown,
+                expected: "deviceType, browserFamily and osFamily are each 'Unknown' in the table props and the record props",
+                provenance: REQ-14,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'ConsentIndexTest, ConsentShowTest.'
+
+    - id: ADM-043
+      title: The status filter narrows the table and stays in the URL and pagination
+      type: hybrid
+      scenario_class: ui_state
+      priority: P1
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-15]
+      role: admin
+      preconditions: [Fixture F1, Fixture F4, 'Logged in as admin']
+      steps:
+          - Search for the withdrawn F4 GUID and choose Active, then Withdrawn
+          - Reload the page
+          - Open /admin/consents?status=active and go to page 2
+          - Click Clear filters
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Active excludes it,
+                expected: "With Active chosen the URL has status=active and the table reads 'No consents match'",
+                provenance: REQ-15,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Withdrawn finds it,
+                expected: 'With Withdrawn chosen the URL has status=withdrawn and the table has exactly 1 row',
+                provenance: REQ-15,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Survives reload,
+                expected: "After reload the Status filter still reads 'Withdrawn' and the row is still there",
+                provenance: REQ-15,
+            }
+          - {
+                id: A4,
+                kind: ui,
+                description: Survives paging,
+                expected: 'On page 2 the URL still has status=active and no row reads Withdrawn',
+                provenance: REQ-15,
+            }
+          - {
+                id: A5,
+                kind: ui,
+                description: Clears,
+                expected: 'After Clear filters the URL has no status parameter',
+                provenance: REQ-15,
+            }
+      cleanup: 'none needed: see Fixture F4'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: ConsentIndexTest.'
+
+    - id: ADM-044
+      title: An unrecognised status is a validation error, not a 500
+      type: api
+      scenario_class: api
+      priority: P2
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-15]
+      role: admin
+      preconditions: ['Logged in as admin']
+      steps:
+          - GET /admin/consents?status=deleted
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Handled,
+                expected: 'Redirects to /admin/consents with a session error on status',
+                provenance: REQ-15,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'ConsentIndexTest.'
+
+    - id: ADM-045
+      title: The record opens from its row by keyboard and shows details and history in Malaysia time
+      type: hybrid
+      scenario_class: ui_state
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-16]
+      role: admin
+      preconditions:
+          [
+              Fixture F1,
+              Fixture F4,
+              'Logged in as admin',
+              'Browser timezone is America/New_York',
+          ]
+      steps:
+          - Open /admin/consents and search for the withdrawn F4 GUID
+          - Focus the link on the GUID and press Enter
+          - Click Back to consents
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Details,
+                expected: "The page shows the GUID, status 'Withdrawn', version 'v1', device 'Desktop', browser 'Chrome' and operating system 'Windows'",
+                provenance: REQ-16,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: History order,
+                expected: "Exactly 2 events, 'Accepted' before 'Withdrawn'; Pest also proves order follows occurred_at, not insert order",
+                provenance: REQ-16,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Timezone,
+                expected: "Each time reads in Asia/Kuala_Lumpur whatever the browser's timezone",
+                provenance: REQ-16,
+            }
+          - {
+                id: A4,
+                kind: ui,
+                description: Back,
+                expected: "'Back to consents' returns to the table with the same search",
+                provenance: REQ-16,
+            }
+      cleanup: 'none needed: see Fixture F4'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: ConsentShowTest.'
+
+    - id: ADM-046
+      title: A signed-out visitor cannot open a record
+      type: hybrid
+      scenario_class: authz_negative
+      priority: P1
+      technique: authz
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-16]
+      role: guest
+      preconditions: [Fixture F4]
+      steps:
+          - Open /admin/consents/{guid} with no session
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Redirected,
+                expected: 'The request is redirected to /login',
+                provenance: REQ-16,
+            }
+          - {
+                id: A2,
+                kind: no_change,
+                description: Nothing shown,
+                expected: 'The response and the login page contain none of the record: no GUID and no device details',
+                provenance: REQ-16,
+            }
+          - {
+                id: A3,
+                kind: api,
+                description: Unverified user,
+                expected: 'A user with no verified email is sent to the verification notice',
+                provenance: REQ-16,
+            }
+      cleanup: 'none needed: see Fixture F4'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: ConsentShowTest.'
+
+    - id: ADM-047
+      title: The table reads no events and its query count does not grow with the rows
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-16]
+      role: admin
+      preconditions: ['Logged in as admin']
+      steps:
+          - GET /admin/consents with 1 consent, then with 21
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: No N+1,
+                expected: 'Both requests run the same number of queries and neither touches consent_events',
+                provenance: REQ-16,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'ConsentIndexTest.'
+
+    - id: ADM-048
+      title: The CSV adds status and device columns after the existing ones and honours the status filter
+      type: hybrid
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-17]
+      role: admin
+      preconditions: [Fixture F1, Fixture F4, 'Logged in as admin']
+      steps:
+          - Open /admin/consents?status=withdrawn and search for the withdrawn F4 GUID
+          - Click Export CSV and save the download
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Header,
+                expected: "First line is exactly 'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family'",
+                provenance: REQ-17,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Row,
+                expected: 'Exactly 1 data line: the GUID, 1, a UTC accepted time, withdrawn, a UTC withdrawn time, Desktop, Chrome, Windows',
+                provenance: REQ-17,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Old rows,
+                expected: 'Pest: null device fields export as Unknown and an active row has an empty withdrawn_at',
+                provenance: REQ-17,
+            }
+      cleanup: 'none needed: download is a temp file'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: ConsentExportTest.'
+
+    - id: ADM-049
+      title: The overview shows withdrawals and device breakdowns labelled as accepted visitors only
+      type: hybrid
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-18]
+      role: admin
+      preconditions: [Fixture F1, 'Logged in as admin']
+      steps:
+          - Open /admin
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Withdrawn,
+                expected: "A 'Withdrawn, 30 days' card is visible",
+                provenance: REQ-18,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Label,
+                expected: "A section named 'Accepted visitors only' says declines are anonymous",
+                provenance: REQ-18,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Breakdowns,
+                expected: 'Browser and Device lists each include Unknown and their percentages add up to 100',
+                provenance: REQ-18,
+            }
+          - {
+                id: A4,
+                kind: state,
+                description: Withdrawn counts,
+                expected: 'Pest: withdrawn30d counts withdrawals since 00:00 Malaysia time 30 days back; totalWithdrawn counts all of them',
+                provenance: REQ-18,
+            }
+      cleanup: 'none needed: read only'
+      tags: [pest, e2e]
+      notes: 'e2e: admin.spec.ts. Pest: OverviewTest.'
+
+    - id: ADM-050
+      title: Breakdowns use the 30-day window, merge null into Unknown and total exactly 100
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-18]
+      role: admin
+      preconditions: ['Logged in as admin']
+      steps:
+          - GET /admin with consents either side of the window, null device fields, and counts that do not divide evenly
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Window,
+                expected: 'Only consents accepted since 00:00 Malaysia time 30 days back are counted, including ones later withdrawn; declines are not',
+                provenance: REQ-18,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Unknown,
+                expected: "Null and the stored value 'Unknown' land in one Unknown bucket",
+                provenance: REQ-18,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Total,
+                expected: 'Percentages add up to exactly 100.0 and a count of zero stays at 0',
+                provenance: REQ-18,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'OverviewTest.'
+
+    - id: ADM-051
+      title: Breakdowns with nothing in the window are all zero
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-18]
+      role: admin
+      preconditions: ['Logged in as admin']
+      steps:
+          - GET /admin with no consents accepted in the last 30 days
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Empty,
+                expected: 'Every bucket has count 0 and percent 0, and Unknown is still listed; the page shows an empty message',
+                provenance: REQ-18,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'OverviewTest.'
+
+    - id: ADM-052
+      title: Withdrawals leave the accept rate formula alone
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: regression
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-18]
+      role: admin
+      preconditions: ['Logged in as admin']
+      steps:
+          - GET /admin with 1 active consent, 1 withdrawn consent and 2 declines
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Rate,
+                expected: 'acceptRate30d is 50 and responses30d is 4',
+                provenance: REQ-18,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'OverviewTest.'
+
+    - id: ADM-053
+      title: Admin pages fit 320px and desktop in light and dark and pass axe
+      type: hybrid
+      scenario_class: render
+      priority: P2
+      technique: accessibility
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-19]
+      role: admin
+      preconditions: [Fixture F1, Fixture F4, 'Logged in as admin']
+      steps:
+          - At 320px and 1280px wide, in light and dark mode, open /admin, /admin/consents and a record page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Width,
+                expected: 'The page has no horizontal scroll; only the table scrolls inside its card',
+                provenance: REQ-19,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Axe,
+                expected: 'No serious or critical WCAG A or AA violations',
+                provenance: REQ-19,
+            }
+      cleanup: 'none needed: see Fixture F4'
+      tags: [e2e]
+      notes: 'admin.spec.ts.'
