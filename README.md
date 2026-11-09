@@ -12,8 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="https://meridian-production-gohs21.laravel.cloud"><strong>Live site</strong></a> ·
-  <a href="https://meridian-production-gohs21.laravel.cloud/admin"><strong>Admin portal</strong></a>
+  <a href="https://meridian-news.laravel.cloud"><strong>Live site</strong></a> ·
+  <a href="https://meridian-news.laravel.cloud/admin"><strong>Admin portal</strong></a>
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@
 > [!IMPORTANT]
 > **Admin sign-in**
 >
-> - **Portal:** [meridian-production-gohs21.laravel.cloud/admin](https://meridian-production-gohs21.laravel.cloud/admin)
+> - **Portal:** [meridian-news.laravel.cloud/admin](https://meridian-news.laravel.cloud/admin)
 > - **Email:** `admin@meridian.test`
 > - **Password:** `123456`
 >
@@ -56,16 +56,16 @@
 
 All 8 requirements, the bonus admin portal and the deliverables are in this repo. Extras are marked, so you can skip them.
 
-Use a private window on the [live site](https://meridian-production-gohs21.laravel.cloud). Cookies are in DevTools, under Application, then Cookies.
+Use a private window on the [live site](https://meridian-news.laravel.cloud). Cookies are in DevTools, under Application, then Cookies.
 
-| #   | Do this                                                                                                        | You should see                                                                                                             | Brief |
-| --- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----- |
-| 1   | Open the site. Try to scroll, then press Esc.                                                                  | The consent box is open. The page doesn't move and the box stays.                                                          | 3, 4  |
-| 2   | Click Accept.                                                                                                  | The box closes and the page scrolls. The `consent` cookie holds a GUID, the time and version 1, for 1 year. Copy the GUID. | 6     |
-| 3   | Reload, then open About.                                                                                       | No box.                                                                                                                    | 7     |
-| 4   | Delete `consent`, reload, then click Decline.                                                                  | The box comes back, then closes. `consent_declined` holds the time, for 1 day.                                             | 7, 8  |
-| 5   | Delete `consent_declined` and reload.                                                                          | The box comes back.                                                                                                        | 8     |
-| 6   | Open the [admin portal](https://meridian-production-gohs21.laravel.cloud/admin), sign in, and search the GUID. | One matching row, Active.                                                                                                  | Bonus |
+| #   | Do this                                                                                           | You should see                                                                                                             | Brief |
+| --- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 1   | Open the site. Try to scroll, then press Esc.                                                     | The consent box is open. The page doesn't move and the box stays.                                                          | 3, 4  |
+| 2   | Click Accept.                                                                                     | The box closes and the page scrolls. The `consent` cookie holds a GUID, the time and version 1, for 1 year. Copy the GUID. | 6     |
+| 3   | Reload, then open About.                                                                          | No box.                                                                                                                    | 7     |
+| 4   | Delete `consent`, reload, then click Decline.                                                     | The box comes back, then closes. `consent_declined` holds the time, for 1 day.                                             | 7, 8  |
+| 5   | Delete `consent_declined` and reload.                                                             | The box comes back.                                                                                                        | 8     |
+| 6   | Open the [admin portal](https://meridian-news.laravel.cloud/admin), sign in, and search the GUID. | One matching row, Active.                                                                                                  | Bonus |
 
 The site is hosted on Laravel Cloud in Singapore, with MySQL 8.4. The same route works on a local copy.
 
