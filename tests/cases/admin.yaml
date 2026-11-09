@@ -41,6 +41,11 @@ sources:
           kind: chat,
           ref: 'Brief to make the admin overview update live with Laravel Reverb (real changes only, private channel, failure never reaches a visitor, throttled refetch, indicator)',
       }
+    - {
+          id: S7,
+          kind: chat,
+          ref: 'Brief to run the live admin overview on hosted Pusher as well as Reverb, chosen by BROADCAST_CONNECTION (secret and app id never reach the browser, no Pusher account in CI)',
+      }
 
 requirements:
     - id: REQ-1
@@ -152,6 +157,18 @@ requirements:
       text: The overview's stats, chart and recent list update on their own when a consent is accepted, declined or withdrawn
       anchor: 'S6 subscribe and refetch'
       risk: { impact: 2, likelihood: 2 }
+    - id: REQ-28
+      text: The pusher connection queues one broadcast for a real change only when its key, secret, app id and cluster are all set
+      anchor: 'S7 guard'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-29
+      text: The browser is told which socket service to use and how to reach it, and never receives the Pusher secret or app id
+      anchor: 'S7 realtime prop'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-30
+      text: A Pusher call that hangs gives up inside the job timeout, and missing Pusher settings never stop the app from booting
+      anchor: 'S7 short timeouts; S6 failure never reaches a visitor'
+      risk: { impact: 3, likelihood: 2 }
 
 scope:
     in:
@@ -1592,3 +1609,254 @@ cases:
       cleanup: 'none needed: see Fixture F3'
       tags: [e2e]
       notes: 'live-overview.spec.ts. Skipped unless E2E_REVERB=1, so CI needs no Reverb server. ADM-059 covers the same refetch with a fake socket.'
+
+    - id: ADM-062
+      title: The pusher connection queues one job for a real change, and none with a setting missing
+      type: api
+      scenario_class: state_transition
+      priority: P1
+      technique: decision_table
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-28]
+      role: guest
+      preconditions:
+          [
+              'The real Pusher driver with made-up credentials and the real database queue; queueing needs no Pusher account',
+          ]
+      steps:
+          - Accept, decline and withdraw with every Pusher setting present
+          - Accept with the key, the secret, the app id or the cluster missing
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Fully set,
+                expected: 'Each real change adds exactly one ConsentsChanged row to jobs, with one try and a 5 second timeout',
+                provenance: REQ-28,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Any setting missing,
+                expected: 'The consent is saved and jobs stays empty',
+                provenance: REQ-28,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-063
+      title: The overview tells the browser which service to use, and never the Pusher secret or app id
+      type: api
+      scenario_class: state_transition
+      priority: P1
+      technique: decision_table
+      required: true
+      mutates: none
+      requirement_refs: [REQ-29]
+      role: admin
+      preconditions:
+          [
+              'Logged in as a verified user',
+              'The real Pusher driver with made-up credentials',
+          ]
+      steps:
+          - Open /admin with hosted Pusher, with PUSHER_HOST set, and with each Pusher setting missing
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Hosted Pusher,
+                expected: 'realtime holds service, key, cluster, channel and event, with no host, port or scheme',
+                provenance: REQ-29,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: PUSHER_HOST set,
+                expected: 'realtime also holds host, port and scheme',
+                provenance: REQ-29,
+            }
+          - {
+                id: A3,
+                kind: api,
+                description: No secret or app id,
+                expected: 'Neither value appears anywhere in the response',
+                provenance: REQ-29,
+            }
+          - {
+                id: A4,
+                kind: api,
+                description: Setting missing,
+                expected: 'realtime is null',
+                provenance: REQ-28,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-064
+      title: The live channel refuses anyone but a verified admin on the Pusher driver
+      type: api
+      scenario_class: authz_negative
+      priority: P1
+      technique: authz
+      required: true
+      mutates: none
+      requirement_refs: [REQ-23]
+      role: guest
+      preconditions:
+          [
+              'The real Pusher driver with made-up credentials; signing needs no server',
+          ]
+      steps:
+          - POST /broadcasting/auth for private-admin.consents as a guest, as an unverified user and as a verified user
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Signed out,
+                expected: 'A guest gets 403',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Unverified,
+                expected: 'A signed-in user with an unverified email gets 403',
+                provenance: REQ-23,
+            }
+          - {
+                id: A3,
+                kind: api,
+                description: Verified,
+                expected: 'A verified user gets 200 and a signature made with the Pusher key',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-065
+      title: Pusher can't hold a worker past the job timeout, and missing settings can't break the app
+      type: api
+      scenario_class: failure_recovery
+      priority: P1
+      technique: fault_injection
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-30]
+      role: guest
+      preconditions: ['The real Pusher driver with made-up credentials']
+      steps:
+          - Read the settings of the Pusher client the app builds
+          - Boot the app with BROADCAST_CONNECTION=pusher and no Pusher values
+          - Accept with the Pusher call pointed at a closed port
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Short timeouts,
+                expected: 'The client request timeout is 2 seconds and the connect timeout 1, under the 5 second job timeout',
+                provenance: REQ-30,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Boots without settings,
+                expected: 'artisan exits cleanly and live updates report off',
+                provenance: REQ-30,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Pusher unreachable,
+                expected: 'The accept redirects and the row is saved',
+                provenance: REQ-30,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php. A3 runs on the sync queue, the worst case, as ADM-058 does for Reverb.'
+
+    - id: ADM-066
+      title: With a Pusher config the page connects, shows Live and gets no secret
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-27, REQ-29]
+      role: admin
+      preconditions:
+          [
+              'Logged in as admin',
+              'A fake socket in the browser and rewritten page props; no Pusher account',
+          ]
+      steps:
+          - Open /admin with hosted Pusher props, announce a change, then read the page props
+          - Open /admin with Pusher props that carry a host
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Hosted,
+                expected: 'The page connects to the cluster address, shows Live and refetches once on a change',
+                provenance: REQ-27,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Custom host,
+                expected: 'The page connects to the given host and shows Live',
+                provenance: REQ-27,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Page props,
+                expected: 'realtime holds only service, key, cluster, channel and event, and no prop names an app id or app secret',
+                provenance: REQ-29,
+            }
+      cleanup: 'none needed'
+      tags: [e2e]
+      notes: 'live-overview.spec.ts. The props here are rewritten, so ADM-063 and ADM-067 are what prove the server keeps the secret back.'
+
+    - id: ADM-067
+      title: On the pusher connection, an accept in one browser updates the overview open in another
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: false
+      mutates: test_data
+      requirement_refs: [REQ-27, REQ-28, REQ-29]
+      role: admin
+      preconditions:
+          [
+              'Logged in as admin',
+              'Reverb and a queue worker running, with BROADCAST_CONNECTION=pusher and PUSHER_HOST, PUSHER_PORT and PUSHER_SCHEME pointing at Reverb',
+              'E2E_PUSHER_LOCAL=1',
+          ]
+      steps:
+          - Open /admin, read the real page props and wait for Live
+          - In a second browser context, accept the consent box as a new visitor
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Real props,
+                expected: 'realtime says pusher and carries the host, and the page holds no secret',
+                provenance: REQ-29,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Live update,
+                expected: 'Total accepted goes up on the open overview without a page load',
+                provenance: REQ-27,
+            }
+      cleanup: 'none needed: see Fixture F3'
+      tags: [e2e]
+      notes: 'live-overview.spec.ts. Skipped unless E2E_PUSHER_LOCAL=1, so CI needs no server and no Pusher account. Reverb speaks the Pusher protocol.'

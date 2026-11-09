@@ -2,6 +2,7 @@ import type { Page, WebSocketRoute } from '@playwright/test';
 
 /** Nothing listens on this port, so an unrouted socket really fails. */
 export const REALTIME = {
+    service: 'reverb' as const,
     key: 'e2e-key',
     host: '127.0.0.1',
     port: 6001,
@@ -10,6 +11,31 @@ export const REALTIME = {
     event: 'consents.changed',
 };
 
+/** Hosted Pusher: no host, so the browser works out the address from the cluster. */
+export const PUSHER_HOSTED = {
+    service: 'pusher' as const,
+    key: 'e2e-key',
+    cluster: 'ap1',
+    channel: REALTIME.channel,
+    event: REALTIME.event,
+};
+
+/** The pusher connection sent to a server of our own. */
+export const PUSHER_CUSTOM_HOST = {
+    ...PUSHER_HOSTED,
+    host: REALTIME.host,
+    port: REALTIME.port,
+    scheme: REALTIME.scheme,
+};
+
+/** Where pusher-js connects for hosted Pusher on PUSHER_HOSTED's cluster. */
+export const PUSHER_HOSTED_SOCKET = /ws-ap1\.pusher\.com(:443)?\/app\//;
+
+type Realtime =
+    | typeof REALTIME
+    | typeof PUSHER_HOSTED
+    | typeof PUSHER_CUSTOM_HOST;
+
 /**
  * Choose whether the overview has live updates, whatever the running app's
  * .env says, by rewriting the props in the first page load. Later requests
@@ -17,7 +43,7 @@ export const REALTIME = {
  */
 export async function setRealtime(
     page: Page,
-    realtime: typeof REALTIME | null,
+    realtime: Realtime | null,
 ): Promise<void> {
     await page.route(/\/admin\/?$/, async (route) => {
         if (route.request().resourceType() !== 'document') {
@@ -50,7 +76,10 @@ export type FakeReverb = {
 };
 
 /** Speak just enough of the Pusher protocol for the page to go live. */
-export async function fakeReverb(page: Page): Promise<FakeReverb> {
+export async function fakeReverb(
+    page: Page,
+    socketUrl: RegExp = /:6001\/app\//,
+): Promise<FakeReverb> {
     let socket: WebSocketRoute | undefined;
     let refusing = false;
     let closed = false;
@@ -59,7 +88,7 @@ export async function fakeReverb(page: Page): Promise<FakeReverb> {
         route.fulfill({ json: { auth: `${REALTIME.key}:signature` } }),
     );
 
-    await page.routeWebSocket(/:6001\/app\//, (ws) => {
+    await page.routeWebSocket(socketUrl, (ws) => {
         if (refusing) {
             void ws.close();
             return;
@@ -112,6 +141,15 @@ export async function fakeReverb(page: Page): Promise<FakeReverb> {
         },
         closed: () => closed,
     };
+}
+
+/** The props the server put in the first page load. */
+export async function pageProps(page: Page): Promise<Record<string, unknown>> {
+    return page.evaluate(() => {
+        const json = document.querySelector('script[data-page="app"]');
+
+        return JSON.parse(json?.textContent ?? '{}').props;
+    });
 }
 
 /** The times, in ms, of the overview's background refetches. */

@@ -88,12 +88,28 @@ export type Paginated<T> = {
     to: number | null;
 };
 
-/** Where the browser reaches Reverb. Null when live updates are off. */
-export type RealtimeConfig = {
+type RealtimeSignal = {
+    channel: string;
+    event: string;
+};
+
+export type ReverbRealtime = RealtimeSignal & {
+    service: 'reverb';
     key: string;
     host: string;
     port: number;
     scheme: string;
-    channel: string;
-    event: string;
 };
+
+/** The host, port and scheme come only when it isn't hosted Pusher. */
+export type PusherRealtime = RealtimeSignal & {
+    service: 'pusher';
+    key: string;
+    cluster: string;
+    host?: string;
+    port?: number;
+    scheme?: string;
+};
+
+/** Where the browser reaches the socket service. Null when live updates are off. */
+export type RealtimeConfig = ReverbRealtime | PusherRealtime;

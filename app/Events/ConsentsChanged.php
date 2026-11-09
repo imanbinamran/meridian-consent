@@ -14,8 +14,8 @@ use Illuminate\Foundation\Events\Dispatchable;
  *
  * Queued, so a visitor's accept never waits on the socket server. It is a
  * nudge and worth nothing a few seconds later, so a failed send is not retried.
- * With Reverb off nothing is queued at all, or a public form would fill the
- * jobs table on an environment with no worker.
+ * With live updates off nothing is queued at all, or a public form would fill
+ * the jobs table on an environment with no worker.
  */
 final class ConsentsChanged implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
@@ -34,11 +34,29 @@ final class ConsentsChanged implements ShouldBroadcast, ShouldDispatchAfterCommi
      */
     public static function liveUpdatesOn(): bool
     {
+        return match (config('broadcasting.default')) {
+            'reverb' => self::reverbIsSetUp(),
+            'pusher' => self::pusherIsSetUp(),
+            default => false,
+        };
+    }
+
+    private static function reverbIsSetUp(): bool
+    {
         $reverb = config('broadcasting.connections.reverb');
 
-        return config('broadcasting.default') === 'reverb'
-            && filled($reverb['key'])
+        return filled($reverb['key'])
             && filled($reverb['options']['host']);
+    }
+
+    private static function pusherIsSetUp(): bool
+    {
+        $pusher = config('broadcasting.connections.pusher');
+
+        return filled($pusher['key'])
+            && filled($pusher['secret'])
+            && filled($pusher['app_id'])
+            && filled($pusher['options']['cluster']);
     }
 
     /**
