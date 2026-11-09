@@ -39,7 +39,7 @@ export function SiteHeader() {
             : 'right';
 
     return (
-        <header className="sticky top-0 z-40 border-b border-foreground/10 bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
+        <header className="site-header sticky top-0 z-40 border-b border-foreground/10 bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
             <div className="hidden border-b border-foreground/10 sm:block">
                 <div className="mx-auto flex h-9 max-w-6xl items-center justify-between px-6 text-xs text-muted-foreground lg:px-8">
                     <p>

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\ContactMessageController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\StoryController;
 use App\Http\Middleware\ShowConsentNotice;
 use Illuminate\Support\Facades\Route;
 
@@ -10,7 +12,10 @@ use Illuminate\Support\Facades\Route;
 | accepts or declines.
 */
 Route::middleware(ShowConsentNotice::class)->group(function () {
-    Route::inertia('/', 'site/home')->name('home');
+    Route::get('/', HomeController::class)->name('home');
+    Route::get('stories/{slug}', StoryController::class)
+        ->where('slug', '[a-z0-9-]+')
+        ->name('stories.show');
     Route::inertia('about', 'site/about')->name('about');
     Route::inertia('privacy', 'site/privacy', [
         'cookies' => [
