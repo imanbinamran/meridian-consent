@@ -1,10 +1,42 @@
-export type ConsentRow = {
+export type ConsentStatus = 'active' | 'expired' | 'withdrawn';
+
+/** Coarse device details. Never null: a missing value arrives as "Unknown". */
+export type ConsentDevice = {
+    deviceType: string;
+    browserFamily: string;
+    osFamily: string;
+};
+
+export type ConsentRow = ConsentDevice & {
     id: number;
     guid: string;
     version: number;
     isCurrent: boolean;
+    status: ConsentStatus;
     acceptedAt: string;
     recordedAt: string | null;
+};
+
+export type ConsentEvent = {
+    id: number;
+    type: string;
+    version: number;
+    occurredAt: string;
+};
+
+export type ConsentRecord = ConsentDevice & {
+    guid: string;
+    version: number;
+    isCurrent: boolean;
+    status: ConsentStatus;
+    events: ConsentEvent[];
+};
+
+export type BreakdownBucket = {
+    label: string;
+    count: number;
+    /** One decimal place. A list's percents add up to exactly 100. */
+    percent: number;
 };
 
 export type RecentConsent = {
@@ -29,6 +61,8 @@ export type OverviewStats = {
     declinedPrev7d: number;
     acceptRate30d: number | null;
     responses30d: number;
+    withdrawn30d: number;
+    totalWithdrawn: number;
     currentVersion: number;
     acceptedCurrentVersion: number;
 };
@@ -38,6 +72,7 @@ export type SortDirection = 'asc' | 'desc';
 export type ConsentFilters = {
     search?: string;
     version?: number;
+    status?: ConsentStatus;
     from?: string;
     to?: string;
     direction: SortDirection;

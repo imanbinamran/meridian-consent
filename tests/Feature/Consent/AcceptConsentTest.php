@@ -35,6 +35,11 @@ it('expires the consent cookie exactly 365 days after acceptance', function () {
         ->toBe(CarbonImmutable::parse('2027-11-08 09:30:15', 'UTC')->getTimestamp());
 });
 
+// CON-079
+it('sets the consent cookie HttpOnly', function () {
+    expect(consentCookie($this->post(route('consent.accept')))->isHttpOnly())->toBeTrue();
+});
+
 it('sets SameSite=Lax, and Secure only over HTTPS', function () {
     $plain = consentCookie($this->post(route('consent.accept')));
     $secure = consentCookie($this->post(str_replace('http://', 'https://', route('consent.accept'))));

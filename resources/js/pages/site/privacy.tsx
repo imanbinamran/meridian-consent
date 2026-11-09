@@ -83,14 +83,24 @@ export default function Privacy({ cookies }: PrivacyProps) {
                     <li>
                         When you accept cookies, we keep a random ID, the time
                         and the notice version, in a cookie and in our database.
-                        None of it says who you are.
+                        In the database we also keep your general device type,
+                        browser family and operating system family. None of it
+                        is your name, email address or IP address.
                     </li>
                     <li>
-                        When you decline, we keep only the time, in a cookie
-                        that lasts one day. We count declines without storing
-                        anything that could identify you.
+                        When you decline, we keep the time in a cookie that
+                        lasts one day. We also add a line to a count of
+                        declines, with no ID or IP address in it.
                     </li>
-                    <li>You can change your choice at any time.</li>
+                    <li>
+                        Whatever you choose, our servers keep a session record
+                        of your visit, with your IP address and browser details.
+                        It is separate from your consent record.
+                    </li>
+                    <li>
+                        You can change your choice at any time. If you decline
+                        after accepting, we mark your record as withdrawn.
+                    </li>
                 </ul>
             ),
         },
@@ -194,7 +204,7 @@ export default function Privacy({ cookies }: PrivacyProps) {
                             <strong>A random ID (GUID)</strong>, such as{' '}
                             <code>3f2b8c1e-7a4d-4e9b-9c1a-5d6e7f8a9b0c</code>.
                             It is generated for you at random and is not linked
-                            to your name, email address, IP address or device.
+                            to your name, email address or IP address.
                         </li>
                         <li>
                             <strong>The time you accepted</strong>, in UTC.
@@ -212,6 +222,31 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         still valid, we keep your existing record rather than
                         create a new one.
                     </p>
+                    <p>
+                        When you first accept, we also work out three broad
+                        details from the header your browser sends and keep them
+                        with that record in our database, not in the cookie:
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Device type</strong>: Desktop, Mobile,
+                            Tablet or Unknown.
+                        </li>
+                        <li>
+                            <strong>Browser family</strong>: Chrome, Safari,
+                            Firefox, Edge or Other.
+                        </li>
+                        <li>
+                            <strong>Operating system family</strong>: Windows,
+                            macOS, Android, iOS, Linux or Other.
+                        </li>
+                    </ul>
+                    <p>
+                        We use these to understand the kinds of device consent
+                        comes from. They are broad and sometimes wrong: an iPad
+                        can show up as a Mac desktop. We do not keep your IP
+                        address or the full browser header with this record.
+                    </p>
                 </>
             ),
         },
@@ -228,10 +263,12 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         again.
                     </p>
                     <p>
-                        We also add one line to an anonymous count of declines,
-                        holding just the time and the notice version. There is
-                        no ID, IP address or anything else that could link the
-                        count back to you or your browser.
+                        If you had not accepted, we also add one line to a count
+                        of declines, holding just the time and the notice
+                        version. That line has no ID, IP address or browser
+                        details in it. The session record described under
+                        &ldquo;Other personal data&rdquo; is kept whatever you
+                        choose.
                     </p>
                 </>
             ),
@@ -254,6 +291,14 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         accepting removes the <code>{cookies.accepted}</code>{' '}
                         cookie, and choosing Accept removes the{' '}
                         <code>{cookies.declined}</code> cookie.
+                    </p>
+                    <p>
+                        When you decline after accepting, we mark your record in
+                        our database as withdrawn and note the time, so your
+                        random ID stops being valid. We keep the withdrawn
+                        record, with its device details, as evidence of what you
+                        chose and when. If you accept again later, you get a new
+                        random ID and a new record.
                     </p>
                     <p>
                         You can also delete cookies through your browser
@@ -290,8 +335,27 @@ export default function Privacy({ cookies }: PrivacyProps) {
                     <p>
                         Like every website, our servers receive technical
                         information such as your IP address and browser type
-                        when you load a page. We use it only to deliver the site
-                        and keep it secure.
+                        when you load a page. We use it to deliver the site and
+                        keep it secure. If you accept, we also use your browser
+                        header to work out the broad device details described
+                        under &ldquo;When you accept&rdquo;.
+                    </p>
+                    <p>
+                        Our servers also keep a session record in our database
+                        for every visitor, whether you accept, decline or have
+                        not chosen yet. It holds your IP address, your full
+                        browser header (user agent), when you were last active,
+                        and working data such as a security token and the last
+                        page you opened.
+                    </p>
+                    <p>
+                        This session record is separate from your consent
+                        record. It does not hold your random ID, and your
+                        consent record does not hold your IP address or your
+                        full browser header. A session ends 2 hours after your
+                        last visit. We clear ended sessions from our database
+                        from time to time, so a record can stay longer than
+                        that.
                     </p>
                 </>
             ),
@@ -409,7 +473,7 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         past.
                     </p>
                 }
-                updated="2026-11-08"
+                updated="2026-11-09"
                 sections={sections}
             />
         </>

@@ -116,6 +116,50 @@ requirements:
       text: The public pages and the consent box have no serious or critical accessibility violations
       anchor: 'S2 a11y scan (WCAG 2.2 AA)'
       risk: { impact: 2, likelihood: 2 }
+    - id: REQ-23
+      text: 'An accept cookie counts only if a consents row exists with its GUID and the same accepted_at (to the second) and version; the row is read only after the format checks pass'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php, forged cookie fix'
+      risk: { impact: 3, likelihood: 3 }
+    - id: REQ-24
+      text: 'If the consents lookup throws a database error, a format-valid cookie counts as valid for that request and a warning is logged'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php, outage handling'
+      risk: { impact: 2, likelihood: 1 }
+    - id: REQ-25
+      text: 'Both consent cookies are HttpOnly and stay unencrypted, so page scripts cannot read them but a visitor can in DevTools'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php makeCookie'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-26
+      text: 'Each acceptance and each withdrawal adds one line to consent_events (guid, type, version, occurred_at UTC, nothing else), written in one transaction with the consents row'
+      anchor: 'S3 database/migrations/2026_11_09_000001_add_withdrawals_and_consent_events.php'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-27
+      text: 'Declining with a verified cookie withdraws that consent: the GUID stops being valid, even if the old cookie is replayed, and a later Accept issues a new GUID'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php withdraw'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-28
+      text: 'At first accept the server stores coarse device_type, browser_family and os_family parsed from the User-Agent header; they are set once and accepted rows only'
+      anchor: 'S3 app/Support/Consent/DeviceProfile.php'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-29
+      text: 'The raw user agent, IP address or anything fingerprint-like is never stored with consent data or logged by the consent flow'
+      anchor: 'S3 database/migrations/2026_11_09_000002_add_device_fields_to_consents.php'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-30
+      text: 'The Privacy Statement says truthfully that coarse device details are kept on accept and that declining afterwards marks the record withdrawn'
+      anchor: 'S3 resources/js/pages/site/privacy.tsx'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-31
+      text: 'A decline with a cookie that matches its row withdraws it, even from an older notice, and adds no anonymous decline; a GUID already withdrawn adds none either'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-32
+      text: 'The withdrawals migration can be re-run after a partial failure and never adds a second accepted event for a GUID'
+      anchor: 'S3 database/migrations/2026_11_09_000001_add_withdrawals_and_consent_events.php'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-33
+      text: 'The Privacy Statement says a session record with raw IP and user agent exists for every visitor, what it holds and that it is separate from the consent record, and claims nothing stronger'
+      anchor: 'S3 resources/js/pages/site/privacy.tsx'
+      risk: { impact: 3, likelihood: 2 }
 
 scope:
     in:
@@ -763,7 +807,7 @@ cases:
       notes: 'consent.spec.ts'
 
     - id: CON-041
-      title: An expired consent cookie brings the box back
+      title: A cookie matching a real row accepted over a year ago brings the box back
       type: web
       scenario_class: ui_state
       priority: P1
@@ -772,13 +816,18 @@ cases:
       mutates: none
       requirement_refs: [REQ-11]
       role: visitor
-      preconditions: [Fixture F1]
+      preconditions:
+          [
+              Fixture F1,
+              'ExpiredConsentSeeder row exists and reads Expired in the admin',
+          ]
       data:
           {
-              cookie: 'consent = valid JSON {guid: new UUID v4, accepted_at: 2025-01-01T00:00:00Z, version: 1}, expires 1 hour ago',
+              cookie: 'consent = the seeded row {guid: 00000000-0000-4000-8000-000000000365, accepted_at: 2025-01-01T00:00:00Z, version: 1}, with 30 days left in the browser',
           }
       steps:
-          - Add the expired consent cookie to the browser
+          - As admin, confirm the row exists and reads Expired
+          - Add the cookie to the browser
           - Open /
       assertions:
           - {
@@ -789,7 +838,7 @@ cases:
                 provenance: REQ-11,
             }
       tags: [e2e]
-      notes: 'consent.spec.ts. The browser drops an expired cookie, so the server sees it as absent, which is what real expiry does.'
+      notes: 'consent.spec.ts. GUID, time and version all match the row, so only the one-year rule can bring the box back.'
 
     - id: CON-042
       title: A tampered consent cookie brings the box back
@@ -1105,3 +1154,642 @@ cases:
       cleanup: 'Clear site cookies'
       tags: [manual]
       notes: 'Manual walkthrough for the hand-in video; CON-030 proves the same value automatically.'
+
+    - id: CON-072
+      title: A valid-format cookie with no database row shows the box
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'No consents row for the cookie GUID']
+      steps:
+          - Send a request to a public page with a well-formed consent cookie and a v4 GUID that has no row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true and consent.choice is null',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest, e2e]
+
+    - id: CON-073
+      title: Accept with a forged cookie issues a new GUID and stores nothing from it
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 09:30:15 UTC']
+      steps:
+          - POST the accept endpoint with a well-formed consent cookie (no row, accepted_at 2026-11-01, version 99)
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: New GUID,
+                expected: 'The new cookie and the one stored row carry a server-made v4 GUID, not the forged one',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Server time and version,
+                expected: 'Stored accepted_at = 2026-11-08 09:30:15 UTC and version = 1',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest, e2e]
+
+    - id: CON-074
+      title: A real GUID with an altered time or version shows the box
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'One consents row for the cookie GUID']
+      steps:
+          - Send a request with the real GUID and accepted_at moved by one second, or moved by a day, or a different version
+          - POST the accept endpoint with the altered cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true for each altered value',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Real row untouched,
+                expected: 'The original row keeps its time and version, and Accept adds a separate row with a new GUID',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-075
+      title: A forged version 99 cookie shows the box
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - Send a request with a well-formed consent cookie, version 99 and no row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-076
+      title: A database error during the lookup does not bring the box back
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-24]
+      role: visitor
+      preconditions:
+          [Fixture F2, 'The consents table is dropped so the lookup throws']
+      steps:
+          - Send a request with a well-formed consent cookie
+          - Send a request with a malformed consent cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Well-formed believed,
+                expected: 'consent.required is false, consent.choice is accepted and one warning is logged',
+                provenance: REQ-24,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Malformed still rejected,
+                expected: 'consent.required is true and no warning is logged',
+                provenance: REQ-24,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Only reachable when sessions are not stored in the same database: with SESSION_DRIVER=database the session read fails first and the request is a 500.'
+
+    - id: CON-077
+      title: Accept during a failed lookup writes nothing from the cookie
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-24]
+      role: visitor
+      preconditions:
+          [
+              Fixture F2,
+              'Queries on the consents table throw, with the schema untouched',
+          ]
+      steps:
+          - POST the accept endpoint with a well-formed consent cookie
+          - POST the accept endpoint with no cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Nothing treated as saved,
+                expected: 'Neither cookie is set, no consents or consent_events row is written, one warning is logged and the toast is an error, not the saved message',
+                provenance: REQ-24,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-078
+      title: The database is read only after the format checks pass
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'Query log on']
+      steps:
+          - Send a request with a cookie that fails the format checks
+          - Send a request with the cookie of a real row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: No read for a bad cookie,
+                expected: 'No query touches the consents table',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: One read for a good cookie,
+                expected: 'Exactly one query touches the consents table',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-079
+      title: Both consent cookies are HttpOnly
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-25]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Click Accept and read the consent cookie
+          - In a new context click Decline and read the consent_declined cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: HttpOnly set,
+                expected: 'Both cookies have HttpOnly true and hold their plain, unencrypted value',
+                provenance: REQ-25,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [pest, e2e]
+
+    - id: CON-080
+      title: Accept writes the row and one accepted event together
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-26]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 09:30:15 UTC']
+      steps:
+          - POST the accept endpoint
+          - Repeat with the consent_events table missing
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: One matching event,
+                expected: 'consent_events has one row with the cookie GUID, type accepted, version 1, occurred_at 2026-11-08 09:30:15 UTC and only the columns id, guid, type, version, occurred_at',
+                provenance: REQ-26,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: All or nothing,
+                expected: 'When the event cannot be written, no consents row is saved',
+                provenance: REQ-26,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-081
+      title: A repeat accept with a verified cookie writes nothing
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-26, REQ-18]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - POST the accept endpoint
+          - POST it again five seconds later with the returned cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Nothing new,
+                expected: 'Still one consents row with an unchanged updated_at, and one event',
+                provenance: REQ-26,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-082
+      title: Decline with a verified cookie withdraws the record
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-27, REQ-26]
+      role: visitor
+      preconditions: [Fixture F2, 'One consents row matching the cookie']
+      steps:
+          - POST the decline endpoint with the cookie
+          - Repeat with the consent_events table missing
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Withdrawn,
+                expected: 'withdrawn_at is set to now, one withdrawn event is written, the consent cookie is cleared, the decline cookie is set and the anonymous count does not change',
+                provenance: REQ-27,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: All or nothing,
+                expected: 'When the event cannot be written, withdrawn_at stays empty',
+                provenance: REQ-27,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-083
+      title: A withdrawn GUID stops being valid when its cookie is replayed
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-27]
+      role: visitor
+      preconditions: [Fixture F2, 'A consent withdrawn through Decline']
+      steps:
+          - Send a request with the old consent cookie and no decline cookie
+          - POST the decline endpoint again with the old cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true',
+                provenance: REQ-27,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: No second withdrawal,
+                expected: 'Still one withdrawn event and the original withdrawn_at',
+                provenance: REQ-27,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: No anonymous decline,
+                expected: 'consent_declines stays empty',
+                provenance: REQ-31,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest, e2e]
+
+    - id: CON-084
+      title: Accepting after a withdrawal issues a new GUID
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-27]
+      role: visitor
+      preconditions: [Fixture F2, 'A consent withdrawn through Decline']
+      steps:
+          - POST the accept endpoint with the old cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: New record,
+                expected: 'A second row with a new GUID and no withdrawn_at, one accepted event for it, and the old row stays withdrawn',
+                provenance: REQ-27,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-085
+      title: A plain or forged decline stays anonymous and writes no event
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-17, REQ-26]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - POST the decline endpoint with no cookies
+          - POST it with a well-formed cookie that has no row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Count only,
+                expected: 'Each adds one consent_declines row, and consent_events stays empty',
+                provenance: REQ-17,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-086
+      title: Existing consents get one accepted event each
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-26]
+      role: visitor
+      preconditions: ['Consents rows that predate consent_events']
+      steps:
+          - Run the migration
+          - Run the demo seeder
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Backfilled,
+                expected: 'One accepted event per row carrying its GUID, version and accepted_at, and no row withdrawn',
+                provenance: REQ-26,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Seeded trail,
+                expected: 'Some demo rows are withdrawn, each with a withdrawn event, and every row has an accepted event',
+                provenance: REQ-26,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-087
+      title: User agents map to the agreed coarse values
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-28]
+      role: visitor
+      preconditions: ['None']
+      steps:
+          - Parse each sample user agent, including Edge, Chrome, Safari, Firefox, Android tablets, iPadOS and an empty header
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Correct family,
+                expected: 'Edge does not read as Chrome, Chrome does not read as Safari, Android tablets read as Tablet, and each value is in its allowed list',
+                provenance: REQ-28,
+            }
+      cleanup: 'None'
+      tags: [pest]
+      notes: 'iPadOS Safari can report as macOS Desktop; the header alone cannot tell.'
+
+    - id: CON-088
+      title: Device details are set once at first accept
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-28]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - POST accept from an Android tablet
+          - POST accept again from Windows Firefox with the returned cookie
+          - POST decline from Windows Firefox with that cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Set once,
+                expected: 'The row reads Tablet, Chrome, Android after every step',
+                provenance: REQ-28,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-089
+      title: The raw user agent and IP are not persisted or logged
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-29]
+      role: visitor
+      preconditions:
+          [Fixture F2, 'A user agent with a unique marker', 'A test IP address']
+      steps:
+          - POST accept and decline with that user agent and IP
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Not persisted,
+                expected: 'Neither value appears in consents, consent_events, consent_declines or the cookie, and consents has no extra columns',
+                provenance: REQ-29,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Not logged,
+                expected: 'The consent flow writes no log line',
+                provenance: REQ-29,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-090
+      title: The Privacy Statement describes device details and withdrawal
+      type: web
+      scenario_class: render
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-30]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Open /privacy
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Truthful copy,
+                expected: 'The page names device type, browser family and operating system family, says declining marks the record withdrawn, and no longer says the ID is not linked to a device',
+                provenance: REQ-30,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+
+    - id: CON-091
+      title: Declining with a cookie from an older notice withdraws its row
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-31]
+      role: visitor
+      preconditions:
+          [
+              Fixture F2,
+              'A version 1 row and its cookie, with CONSENT_VERSION raised to 2',
+          ]
+      steps:
+          - POST the decline endpoint with the version 1 cookie
+          - Repeat with a version 1 cookie whose time differs from its row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Withdrawn,
+                expected: 'A matching cookie sets withdrawn_at, adds a version 1 withdrawn event and leaves consent_declines empty',
+                provenance: REQ-31,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Row still verifies,
+                expected: 'A cookie that does not match leaves the row live and counts as one plain decline',
+                provenance: REQ-31,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-092
+      title: The withdrawals migration can be re-run and adds the withdrawn_at index
+      type: api
+      scenario_class: persistence
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-32]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - Roll the migration back, add only withdrawn_at, add a consent, run the migration
+          - Run the migration twice on a table where one consent has no accepted event
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Finishes,
+                expected: 'consent_events exists and each consent has exactly one accepted event',
+                provenance: REQ-32,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Index,
+                expected: 'consents has an index on withdrawn_at',
+                provenance: REQ-32,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-093
+      title: The Privacy Statement describes the session record without overclaiming
+      type: web
+      scenario_class: render
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-33]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Open /privacy
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Truthful copy,
+                expected: 'The page says a session record holds the IP address and user agent and is separate from the consent record, says browser details feed the device data on accept, and no longer says we keep only the time, that declines store nothing that could identify you, or that browser type is used only to deliver the site',
+                provenance: REQ-33,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]

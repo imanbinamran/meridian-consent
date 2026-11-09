@@ -1,3 +1,5 @@
+import type { ConsentDevice } from './types';
+
 const LOCALE = 'en-MY';
 
 const numberFormat = new Intl.NumberFormat(LOCALE);
@@ -37,6 +39,19 @@ export function pluralize(
     const noun = pluralRules.select(count) === 'one' ? forms.one : forms.other;
 
     return `${formatNumber(count)} ${noun}`;
+}
+
+/** "Desktop · Chrome on macOS", or just "Unknown" when nothing was recorded. */
+export function formatDevice({
+    deviceType,
+    browserFamily,
+    osFamily,
+}: ConsentDevice): string {
+    if ([deviceType, browserFamily, osFamily].every((v) => v === 'Unknown')) {
+        return 'Unknown';
+    }
+
+    return `${deviceType} · ${browserFamily} on ${osFamily}`;
 }
 
 /** "8 Nov 2026, 2:32 pm" in the given timezone. */

@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -10,9 +11,10 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { CopyButton } from './copy-button';
-import { formatRecent, formatUtc } from './format';
+import { formatDevice, formatRecent, formatUtc } from './format';
 import { LocalTime } from './local-time';
 import { PRESSABLE } from './motion';
+import { StatusBadge } from './status-badge';
 import type { ConsentRow, SortDirection } from './types';
 
 type Props = {
@@ -20,6 +22,8 @@ type Props = {
     timeZone: string;
     direction: SortDirection;
     onSort: (direction: SortDirection) => void;
+    /** Where each row's GUID links to. */
+    recordUrl: (guid: string) => string;
     /** True once a reload has taken longer than a blink. */
     busy?: boolean;
 };
@@ -29,16 +33,19 @@ export function ConsentsTable({
     timeZone,
     direction,
     onSort,
+    recordUrl,
     busy = false,
 }: Props) {
     const SortIcon = direction === 'desc' ? ArrowDown : ArrowUp;
 
     return (
-        <Table className="min-w-[42rem]" aria-busy={busy}>
+        <Table className="min-w-[56rem]" aria-busy={busy}>
             <TableHeader>
                 <TableRow className="hover:bg-transparent">
                     <TableHead className="ps-4">GUID</TableHead>
                     <TableHead>Version</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Device</TableHead>
                     <TableHead
                         aria-sort={
                             direction === 'desc' ? 'descending' : 'ascending'
@@ -78,12 +85,16 @@ export function ConsentsTable({
                     <TableRow key={row.id}>
                         <TableCell className="ps-4">
                             <div className="flex items-center gap-1">
-                                <span
+                                <Link
+                                    href={recordUrl(row.guid)}
                                     dir="ltr"
-                                    className="font-mono text-xs whitespace-nowrap"
+                                    className="rounded-sm font-mono text-xs whitespace-nowrap underline decoration-muted-foreground/40 underline-offset-4 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
                                 >
+                                    <span className="sr-only">
+                                        View record{' '}
+                                    </span>
                                     {row.guid}
-                                </span>
+                                </Link>
                                 <CopyButton
                                     value={row.guid}
                                     label="Copy GUID"
@@ -104,6 +115,12 @@ export function ConsentsTable({
                             >
                                 v{row.version}
                             </Badge>
+                        </TableCell>
+                        <TableCell>
+                            <StatusBadge status={row.status} />
+                        </TableCell>
+                        <TableCell className="min-w-40 whitespace-normal">
+                            {formatDevice(row)}
                         </TableCell>
                         <TableCell>
                             <LocalTime

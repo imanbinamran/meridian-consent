@@ -4,8 +4,8 @@ use App\Models\Consent;
 use App\Models\ConsentDecline;
 use Carbon\CarbonImmutable;
 
-use function Tests\Feature\Consent\acceptedCookieValue;
 use function Tests\Feature\Consent\consentCookie;
+use function Tests\Feature\Consent\recordedCookieValue;
 
 require_once __DIR__.'/ConsentHelpers.php';
 
@@ -23,6 +23,11 @@ it('sets consent_declined to the UTC decline time, expiring after 1 day', functi
     expect($cookie->getValue())->toBe('2026-11-08T09:30:15Z')
         ->and($cookie->getExpiresTime())->toBe(CarbonImmutable::parse('2026-11-09 09:30:15', 'UTC')->getTimestamp())
         ->and($cookie->getSameSite())->toBe('lax');
+});
+
+// CON-079
+it('sets the decline cookie HttpOnly', function () {
+    expect(consentCookie($this->post(route('consent.decline')), 'consent_declined')->isHttpOnly())->toBeTrue();
 });
 
 // CON-053
@@ -47,7 +52,7 @@ it('does not count the same decline twice', function () {
 
 it('clears an earlier consent cookie', function () {
     $response = $this
-        ->withUnencryptedCookie('consent', acceptedCookieValue())
+        ->withUnencryptedCookie('consent', recordedCookieValue())
         ->post(route('consent.decline'));
 
     $cleared = consentCookie($response, 'consent');

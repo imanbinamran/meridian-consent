@@ -2,6 +2,7 @@
 
 use App\Models\Consent;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -22,7 +23,7 @@ test('it lists consents 25 to a page, newest first', function () {
             ->where('consents.last_page', 2)
             ->where('filters', ['direction' => 'desc'])
             ->has('consents.data.0', fn (Assert $row) => $row
-                ->hasAll(['id', 'guid', 'version', 'isCurrent', 'acceptedAt', 'recordedAt'])),
+                ->hasAll(['id', 'guid', 'version', 'isCurrent', 'status', 'deviceType', 'browserFamily', 'osFamily', 'acceptedAt', 'recordedAt'])),
         );
 
     $this->get(route('admin.consents.index', ['page' => 2]))
@@ -126,4 +127,100 @@ test('the empty table still renders', function () {
             ->has('consents.data', 0)
             ->where('consents.total', 0)
             ->where('versions', [1]));
+});
+
+test('ADM-041 each row says whether it is active or withdrawn and what device it came from', function () {
+    $active = Consent::factory()->create([
+        'accepted_at' => '2026-11-02 00:00:00',
+        'device_type' => 'Desktop',
+        'browser_family' => 'Chrome',
+        'os_family' => 'macOS',
+    ]);
+    $withdrawn = Consent::factory()->withdrawn()->create(['accepted_at' => '2026-11-01 00:00:00']);
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.data.0.id', $active->id)
+            ->where('consents.data.0.status', 'active')
+            ->where('consents.data.0.deviceType', 'Desktop')
+            ->where('consents.data.0.browserFamily', 'Chrome')
+            ->where('consents.data.0.osFamily', 'macOS')
+            ->where('consents.data.1.id', $withdrawn->id)
+            ->where('consents.data.1.status', 'withdrawn'));
+});
+
+test('ADM-042 rows from before device details were kept read Unknown', function () {
+    Consent::factory()->create(['device_type' => null, 'browser_family' => null, 'os_family' => null]);
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.data.0.deviceType', 'Unknown')
+            ->where('consents.data.0.browserFamily', 'Unknown')
+            ->where('consents.data.0.osFamily', 'Unknown'));
+});
+
+test('ADM-043 the status filter shows only that status', function (string $status, int $total) {
+    Consent::factory()->count(2)->create();
+    Consent::factory()->count(3)->withdrawn()->create();
+
+    $this->get(route('admin.consents.index', ['status' => $status]))
+        ->assertInertia(function (Assert $page) use ($status, $total) {
+            $page->where('consents.total', $total)->where('filters.status', $status);
+
+            expect(collect($page->toArray()['props']['consents']['data'])->pluck('status')->unique()->all())->toBe([$status]);
+        });
+})->with([
+    'active' => ['active', 2],
+    'withdrawn' => ['withdrawn', 3],
+]);
+
+test('ADM-043 no status means every status, and it is left out of the filters', function () {
+    Consent::factory()->create();
+    Consent::factory()->withdrawn()->create();
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.total', 2)
+            ->missing('filters.status'));
+});
+
+test('ADM-043 the status filter combines with the others and survives paging', function () {
+    Consent::factory()->count(26)->withdrawn()->create(['version' => 2]);
+    Consent::factory()->withdrawn()->create(['version' => 1]);
+    Consent::factory()->create(['version' => 2]);
+
+    $this->get(route('admin.consents.index', ['status' => 'withdrawn', 'version' => 2]))
+        ->assertInertia(function (Assert $page) {
+            $page->where('consents.total', 26);
+
+            expect($page->toArray()['props']['consents']['next_page_url'])
+                ->toContain('status=withdrawn')
+                ->toContain('version=2');
+        });
+});
+
+test('ADM-044 an unrecognised status is a validation error, not a 500', function () {
+    $this->get(route('admin.consents.index', ['status' => 'deleted']))
+        ->assertRedirect(route('admin.consents.index'))
+        ->assertSessionHasErrors('status');
+});
+
+test('ADM-047 the table never reads events and its queries do not grow with the rows', function () {
+    $queriesFor = function (): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get(route('admin.consents.index'))->assertOk();
+        DB::disableQueryLog();
+
+        return array_column(DB::getQueryLog(), 'query');
+    };
+
+    Consent::factory()->withdrawn()->create();
+    $one = $queriesFor();
+
+    Consent::factory()->count(20)->withdrawn()->create();
+    $many = $queriesFor();
+
+    expect(count($many))->toBe(count($one))
+        ->and(implode(' ', $many))->not->toContain('consent_events');
 });

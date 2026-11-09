@@ -31,6 +31,7 @@ class ConsentIndexRequest extends FormRequest
             // GUID simply finds nothing; it is not an error.
             'search' => ['nullable', 'string', 'max:100'],
             'version' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', Rule::in(Consent::STATUSES)],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'direction' => ['nullable', Rule::in(self::DIRECTIONS)],
@@ -60,7 +61,7 @@ class ConsentIndexRequest extends FormRequest
     /**
      * The validated filters, normalised, with empty values left out.
      *
-     * @return array{search?: string, version?: int, from?: string, to?: string, direction: 'asc'|'desc'}
+     * @return array{search?: string, version?: int, status?: string, from?: string, to?: string, direction: 'asc'|'desc'}
      */
     public function filters(): array
     {
@@ -69,6 +70,7 @@ class ConsentIndexRequest extends FormRequest
         return array_filter([
             'search' => isset($validated['search']) ? (strtolower(trim($validated['search'])) ?: null) : null,
             'version' => isset($validated['version']) ? (int) $validated['version'] : null,
+            'status' => $validated['status'] ?? null,
             'from' => $validated['from'] ?? null,
             'to' => $validated['to'] ?? null,
             'direction' => $validated['direction'] ?? 'desc',
@@ -89,6 +91,7 @@ class ConsentIndexRequest extends FormRequest
                 $query->whereLike('guid', '%'.addcslashes($search, '%_\\').'%');
             })
             ->when($filters['version'] ?? null, fn (Builder $query, int $version) => $query->where('version', $version))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->whereStatus($status))
             // Dates are local days. Convert each edge to UTC for the query.
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->where(
                 'accepted_at', '>=', CarbonImmutable::parse($from, $timezone)->startOfDay()->utc(),

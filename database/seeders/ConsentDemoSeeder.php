@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Consent;
 use App\Models\ConsentDecline;
+use App\Models\ConsentEvent;
+use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -11,7 +13,8 @@ use Illuminate\Support\Str;
 /**
  * About 400 acceptances and 120 declines over the last 30 days, shaped like
  * real traffic: busier on weekdays, during Malaysian daytime, and growing
- * slowly over the month. Skipped when consents already exist.
+ * slowly over the month. About 1 in 10 acceptances is later withdrawn. Every
+ * consent gets its audit trail. Skipped when consents already exist.
  */
 class ConsentDemoSeeder extends Seeder
 {
@@ -33,14 +36,25 @@ class ConsentDemoSeeder extends Seeder
         $now = CarbonImmutable::now('UTC');
 
         $consents = [];
+        $events = [];
         foreach ($this->timestamps(self::ACCEPTED) as $acceptedAt) {
+            $guid = (string) Str::uuid();
+            $withdrawnAt = $this->withdrawnAt($acceptedAt, $now);
+
             $consents[] = [
-                'guid' => (string) Str::uuid(),
+                'guid' => $guid,
                 'version' => $version,
                 'accepted_at' => $acceptedAt,
+                'withdrawn_at' => $withdrawnAt,
+                ...$this->device(),
                 'created_at' => $acceptedAt,
-                'updated_at' => $acceptedAt,
+                'updated_at' => $withdrawnAt ?? $acceptedAt,
             ];
+            $events[] = ['guid' => $guid, 'type' => ConsentEvent::ACCEPTED, 'version' => $version, 'occurred_at' => $acceptedAt];
+
+            if ($withdrawnAt !== null) {
+                $events[] = ['guid' => $guid, 'type' => ConsentEvent::WITHDRAWN, 'version' => $version, 'occurred_at' => $withdrawnAt];
+            }
         }
 
         $declines = [];
@@ -52,11 +66,55 @@ class ConsentDemoSeeder extends Seeder
             Consent::query()->insert($chunk);
         }
 
+        foreach (array_chunk($events, 200) as $chunk) {
+            ConsentEvent::query()->insert($chunk);
+        }
+
         foreach (array_chunk($declines, 200) as $chunk) {
             ConsentDecline::query()->insert($chunk);
         }
 
         $this->command?->info(sprintf('Seeded %d consents and %d declines up to %s.', count($consents), count($declines), $now->toDateTimeString()));
+    }
+
+    /**
+     * Coarse device details from a typical mix of real user agents.
+     *
+     * @return array{device_type: string, browser_family: string, os_family: string}
+     */
+    private function device(): array
+    {
+        $agents = [
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+            'Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0',
+        ];
+
+        $profile = DeviceProfile::fromUserAgent($agents[array_rand($agents)]);
+
+        return [
+            'device_type' => $profile->deviceType,
+            'browser_family' => $profile->browserFamily,
+            'os_family' => $profile->osFamily,
+        ];
+    }
+
+    /**
+     * A time this consent was withdrawn, or null for the 9 in 10 that stay.
+     */
+    private function withdrawnAt(string $acceptedAt, CarbonImmutable $now): ?string
+    {
+        if (mt_rand(1, 10) !== 1) {
+            return null;
+        }
+
+        $at = CarbonImmutable::parse($acceptedAt, 'UTC')->addMinutes(mt_rand(5, 7 * 24 * 60));
+
+        return $at->greaterThan($now) ? null : $at->format('Y-m-d H:i:s');
     }
 
     /**

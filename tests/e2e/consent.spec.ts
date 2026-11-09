@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { ADMIN_STORAGE_STATE } from './support/admin';
 import {
     ACCEPTED_COOKIE,
     COPY,
     DAY_SECONDS,
     DECLINED_COOKIE,
+    EXPIRED_CONSENT,
     ISO_UTC,
     PUBLIC_PAGES,
     UUID_V4,
@@ -177,6 +179,7 @@ test.describe('accept', () => {
         await expect(dialog).toBeHidden();
 
         const cookie = await waitForCookie(context, ACCEPTED_COOKIE);
+        expect(cookie.httpOnly).toBe(true);
         const value = parseAcceptedCookie(cookie);
 
         expect(Object.keys(value).sort()).toEqual([
@@ -248,20 +251,29 @@ test.describe('accept cookie missing, expired or invalid', () => {
         await expectConsentBox(page);
     });
 
-    test('CON-041 a cookie still in the browser but accepted over a year ago brings the box back', async ({
+    test('CON-041 a cookie matching a real row accepted over a year ago brings the box back', async ({
         page,
         context,
+        browser,
         baseURL,
     }) => {
-        const value = JSON.stringify({
-            guid: crypto.randomUUID(),
-            accepted_at: '2025-01-01T00:00:00Z',
-            version: 1,
+        // The row is really there and everything but its age matches the
+        // cookie, so the one-year rule is what brings the box back.
+        const admin = await browser.newContext({
+            baseURL,
+            storageState: ADMIN_STORAGE_STATE,
         });
+        const adminPage = await admin.newPage();
+        await adminPage.goto(`/admin/consents/${EXPIRED_CONSENT.guid}`);
+        await expect(
+            adminPage.locator('dt', { hasText: /^Status$/ }).locator('+ dd'),
+        ).toHaveText('Expired');
+        await admin.close();
+
         await addAcceptedCookie(
             context,
             baseURL as string,
-            value,
+            JSON.stringify(EXPIRED_CONSENT),
             30 * DAY_SECONDS,
         );
 
@@ -300,6 +312,69 @@ test.describe('accept cookie missing, expired or invalid', () => {
         });
     }
 
+    test('CON-072 a well-formed cookie with no database row brings the box back', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        const value = JSON.stringify({
+            guid: crypto.randomUUID(),
+            accepted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+            version: 1,
+        });
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            value,
+            30 * DAY_SECONDS,
+        );
+
+        await page.goto('/');
+        await expectConsentBox(page);
+    });
+
+    test('CON-073 Accept with a forged cookie replaces its GUID', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        const forgedGuid = crypto.randomUUID();
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            JSON.stringify({
+                guid: forgedGuid,
+                accepted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+                version: 99,
+            }),
+            30 * DAY_SECONDS,
+        );
+
+        await page.goto('/');
+        const dialog = await expectConsentBox(page);
+        await dialog
+            .getByRole('button', { name: 'Accept', exact: true })
+            .click();
+        await expect(dialog).toBeHidden();
+
+        await expect
+            .poll(
+                async () =>
+                    parseAcceptedCookie(
+                        await waitForCookie(context, ACCEPTED_COOKIE),
+                    ).guid,
+            )
+            .not.toBe(forgedGuid);
+        const accepted = parseAcceptedCookie(
+            await waitForCookie(context, ACCEPTED_COOKIE),
+        );
+        expect(accepted.guid).toMatch(UUID_V4);
+        expect(accepted.version).toBe(1);
+
+        await page.reload();
+        await expectNoConsentBox(page);
+    });
+
     test('CON-043 (browser half) a cookie from an older version brings the box back', async ({
         page,
         context,
@@ -331,6 +406,7 @@ test.describe('decline', () => {
         const before = Date.now();
         const cookie = await declineConsent(page);
 
+        expect(cookie.httpOnly).toBe(true);
         const value = decodeCookieValue(cookie.value);
         expect(value).toMatch(ISO_UTC);
         expect(Math.abs(Date.parse(value) - before)).toBeLessThan(
@@ -391,6 +467,71 @@ test.describe('decline', () => {
 
         await page.goto('/');
         await expectConsentBox(page);
+    });
+});
+
+test.describe('withdrawing consent', () => {
+    test('CON-083 a cookie replayed after withdrawing brings the box back', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        await page.goto('/');
+        await acceptConsent(page);
+        const accepted = await waitForCookie(context, ACCEPTED_COOKIE);
+        await waitForPublicPage(page);
+
+        await page
+            .getByRole('contentinfo')
+            .getByRole('button', { name: 'Cookie settings' })
+            .click();
+        await declineConsent(page);
+        await expect
+            .poll(() => getCookie(context, ACCEPTED_COOKIE))
+            .toBeUndefined();
+
+        await context.clearCookies({ name: DECLINED_COOKIE });
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            decodeCookieValue(accepted.value),
+            30 * DAY_SECONDS,
+        );
+
+        await page.reload();
+        await expectConsentBox(page);
+    });
+});
+
+test.describe('privacy statement', () => {
+    test('CON-090 says what device details we keep and what withdrawing does', async ({
+        page,
+    }) => {
+        await page.goto('/privacy');
+        const main = page.locator('body');
+
+        await expect(main).toContainText('Browser family');
+        await expect(main).toContainText('Device type');
+        await expect(main).toContainText('Operating system family');
+        await expect(main).toContainText('mark your record in our database as');
+        await expect(main).not.toContainText('IP address or device');
+    });
+
+    test('CON-093 says the session record exists and claims nothing it cannot back up', async ({
+        page,
+    }) => {
+        await page.goto('/privacy');
+        const main = page.locator('body');
+
+        await expect(main).toContainText('session record in our database');
+        await expect(main).toContainText('browser header (user agent)');
+        await expect(main).toContainText(
+            'This session record is separate from your consent record',
+        );
+        await expect(main).toContainText('work out the broad device details');
+        await expect(main).not.toContainText('we keep only the time');
+        await expect(main).not.toContainText('could identify you');
+        await expect(main).not.toContainText('only to deliver the site');
     });
 });
 

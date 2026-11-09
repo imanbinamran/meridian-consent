@@ -143,7 +143,18 @@ export async function declineConsent(page: Page): Promise<Cookie> {
     return waitForCookie(page.context(), DECLINED_COOKIE);
 }
 
-/** Put a consent cookie straight into the browser, URL-encoded like PHP sends it. */
+/**
+ * Put a consent cookie straight into the browser, URL-encoded like PHP sends it.
+ * No database row is created, so the server treats it as forged: use it only
+ * where the box is expected to come back. To get a real cookie, click Accept.
+ */
+/** A real row past its one-year lifetime, from ExpiredConsentSeeder. */
+export const EXPIRED_CONSENT = {
+    guid: '00000000-0000-4000-8000-000000000365',
+    accepted_at: '2025-01-01T00:00:00Z',
+    version: 1,
+};
+
 export async function addAcceptedCookie(
     context: BrowserContext,
     baseURL: string,
@@ -156,6 +167,7 @@ export async function addAcceptedCookie(
             value: encodeURIComponent(value),
             url: baseURL,
             expires: Math.floor(Date.now() / 1000) + expiresInSeconds,
+            httpOnly: true,
             sameSite: 'Lax',
         },
     ]);

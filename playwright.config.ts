@@ -42,6 +42,7 @@ export default defineConfig({
             name: 'chromium-mobile',
             use: { ...devices['Pixel 7'] },
             testMatch: /(consent|responsive)\.spec\.ts/,
+            dependencies: ['setup'],
         },
     ],
     webServer: externalBaseURL

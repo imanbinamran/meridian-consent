@@ -4,10 +4,12 @@ import {
     Download,
     FileCheck2,
     Percent,
+    Undo2,
     Users,
     XCircle,
 } from 'lucide-react';
 import { ActivityChart } from '@/components/admin/activity-chart';
+import { BreakdownCard } from '@/components/admin/breakdown-card';
 import {
     comparisonHint,
     formatNumber,
@@ -18,6 +20,7 @@ import { PageHeader } from '@/components/admin/page-header';
 import { RecentAcceptances } from '@/components/admin/recent-acceptances';
 import { StatCard } from '@/components/admin/stat-card';
 import type {
+    BreakdownBucket,
     DailyPoint,
     OverviewStats,
     RecentConsent,
@@ -30,10 +33,19 @@ type Props = {
     timezone: string;
     stats: OverviewStats;
     chart: DailyPoint[];
+    browsers: BreakdownBucket[];
+    devices: BreakdownBucket[];
     recent: RecentConsent[];
 };
 
-export default function Overview({ timezone, stats, chart, recent }: Props) {
+export default function Overview({
+    timezone,
+    stats,
+    chart,
+    browsers,
+    devices,
+    recent,
+}: Props) {
     const acceptedTrend = percentChange(stats.accepted7d, stats.acceptedPrev7d);
     const declinedTrend = percentChange(stats.declined7d, stats.declinedPrev7d);
 
@@ -64,7 +76,7 @@ export default function Overview({ timezone, stats, chart, recent }: Props) {
 
                 <section
                     aria-label="Key numbers"
-                    className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10.5rem),1fr))] gap-4"
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
                 >
                     <StatCard
                         label="Total accepted"
@@ -101,6 +113,12 @@ export default function Overview({ timezone, stats, chart, recent }: Props) {
                         )}
                     />
                     <StatCard
+                        label="Withdrawn, 30 days"
+                        icon={Undo2}
+                        value={formatNumber(stats.withdrawn30d)}
+                        hint={`${formatNumber(stats.totalWithdrawn)} all time`}
+                    />
+                    <StatCard
                         label="Accept rate, 30d"
                         icon={Percent}
                         value={
@@ -130,6 +148,29 @@ export default function Overview({ timezone, stats, chart, recent }: Props) {
                         <RecentAcceptances items={recent} timeZone={timezone} />
                     </div>
                 </div>
+
+                <section
+                    aria-labelledby="breakdowns-heading"
+                    className="flex flex-col gap-3"
+                >
+                    <div className="space-y-1">
+                        <h2
+                            id="breakdowns-heading"
+                            className="text-lg font-semibold tracking-tight"
+                        >
+                            Accepted visitors only
+                        </h2>
+                        <p className="max-w-prose text-sm text-pretty text-muted-foreground">
+                            Consents accepted in the last 30 days, including any
+                            later withdrawn. Declines are anonymous and carry no
+                            device data, so they are not counted here.
+                        </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <BreakdownCard title="Browser" buckets={browsers} />
+                        <BreakdownCard title="Device" buckets={devices} />
+                    </div>
+                </section>
             </div>
         </>
     );

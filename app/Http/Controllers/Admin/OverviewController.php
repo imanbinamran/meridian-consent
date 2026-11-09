@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Consent;
 use App\Models\ConsentDecline;
+use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -50,10 +51,14 @@ class OverviewController extends Controller
                     ->count(),
                 'acceptRate30d' => $responses30 > 0 ? round($accepted30 / $responses30 * 100, 1) : null,
                 'responses30d' => $responses30,
+                'withdrawn30d' => Consent::query()->where('withdrawn_at', '>=', $thirtyDaysAgo)->count(),
+                'totalWithdrawn' => Consent::query()->whereNotNull('withdrawn_at')->count(),
                 'currentVersion' => $currentVersion,
                 'acceptedCurrentVersion' => Consent::query()->where('version', $currentVersion)->count(),
             ],
             'chart' => $this->dailySeries($today, $thirtyDaysAgo),
+            'browsers' => $this->breakdown('browser_family', DeviceProfile::BROWSER_FAMILIES, $thirtyDaysAgo),
+            'devices' => $this->breakdown('device_type', DeviceProfile::DEVICE_TYPES, $thirtyDaysAgo),
             'recent' => Consent::query()
                 ->latest('accepted_at')
                 ->latest('id')
@@ -66,6 +71,86 @@ class OverviewController extends Controller
                     'acceptedAt' => $consent->accepted_at->toIso8601ZuluString(),
                 ]),
         ]);
+    }
+
+    /**
+     * How the consents accepted since a date split across one column. Declines
+     * are anonymous, so they can never be part of this.
+     *
+     * Every known value is listed, even at zero, with the biggest first and
+     * Other and Unknown last. Unknown holds both rows from before device
+     * details were kept (null) and devices we could not place ('Unknown').
+     *
+     * @param  literal-string  $column
+     * @param  list<string>  $known
+     * @return list<array{label: string, count: int, percent: float}>
+     */
+    private function breakdown(string $column, array $known, CarbonImmutable $since): array
+    {
+        $rows = Consent::query()
+            ->where('accepted_at', '>=', $since)
+            ->selectRaw("{$column} as bucket, count(*) as total")
+            ->groupBy($column)
+            ->toBase()
+            ->get();
+
+        $counts = array_fill_keys([...$known, DeviceProfile::UNKNOWN], 0);
+
+        foreach ($rows as $row) {
+            $label = $row->bucket ?? DeviceProfile::UNKNOWN;
+            $counts[$label] = ($counts[$label] ?? 0) + (int) $row->total;
+        }
+
+        // A stable sort, so equal counts stay in the order of the known list.
+        uasort($counts, fn (int $a, int $b) => $b <=> $a);
+
+        foreach (['Other', DeviceProfile::UNKNOWN] as $last) {
+            if (array_key_exists($last, $counts)) {
+                $count = $counts[$last];
+                unset($counts[$last]);
+                $counts[$last] = $count;
+            }
+        }
+
+        $percents = $this->percentsTotalling100($counts);
+
+        return array_map(
+            fn (string $label, int $count, float $percent) => ['label' => $label, 'count' => $count, 'percent' => $percent],
+            array_keys($counts),
+            array_values($counts),
+            $percents,
+        );
+    }
+
+    /**
+     * Shares to one decimal place that add up to exactly 100. Plain rounding
+     * can land on 99.9 or 100.1, so each share is rounded down and the tenths
+     * left over go to the shares that lost the most. A count of zero loses
+     * nothing, so it stays at zero.
+     *
+     * @param  array<string, int>  $counts
+     * @return list<float>
+     */
+    private function percentsTotalling100(array $counts): array
+    {
+        $total = array_sum($counts);
+
+        if ($total === 0) {
+            return array_fill(0, count($counts), 0.0);
+        }
+
+        $exact = array_map(fn (int $count) => $count * 1000 / $total, array_values($counts));
+        $tenths = array_map(fn (float|int $share) => (int) floor($share), $exact);
+        $left = 1000 - array_sum($tenths);
+
+        $byRemainder = array_keys($exact);
+        usort($byRemainder, fn (int $a, int $b) => ($exact[$b] - $tenths[$b]) <=> ($exact[$a] - $tenths[$a]));
+
+        foreach (array_slice($byRemainder, 0, $left) as $index) {
+            $tenths[$index]++;
+        }
+
+        return array_values(array_map(fn (int $share) => round($share / 10, 1), $tenths));
     }
 
     /**

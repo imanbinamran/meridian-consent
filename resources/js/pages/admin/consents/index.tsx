@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { dashboard } from '@/routes';
-import { exportMethod, index } from '@/routes/admin/consents';
+import { exportMethod, index, show } from '@/routes/admin/consents';
 
 type Props = {
     timezone: string;
@@ -34,6 +34,7 @@ function toQuery(filters: Filters, page?: number) {
     return {
         search: filters.search || undefined,
         version: filters.version || undefined,
+        status: filters.status || undefined,
         from: filters.from || undefined,
         to: filters.to || undefined,
         direction: filters.direction === 'asc' ? 'asc' : undefined,
@@ -54,7 +55,11 @@ export default function ConsentsIndex({
 
     useEffect(() => () => window.clearTimeout(busyTimer.current), []);
     const filtering = Boolean(
-        filters.search || filters.version || filters.from || filters.to,
+        filters.search ||
+        filters.version ||
+        filters.status ||
+        filters.from ||
+        filters.to,
     );
 
     const visit = (next: Filters) => {
@@ -92,7 +97,7 @@ export default function ConsentsIndex({
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Consents"
-                    description={`Every recorded acceptance. Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
+                    description={`Every recorded acceptance. Open a GUID to see its history. Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
                     actions={
                         <Button variant="outline" asChild>
                             <a
@@ -143,13 +148,21 @@ export default function ConsentsIndex({
                             timeZone={timezone}
                             direction={filters.direction}
                             onSort={(direction) => update({ direction })}
+                            recordUrl={(guid) =>
+                                show.url(guid, {
+                                    query: toQuery(
+                                        filters,
+                                        consents.current_page,
+                                    ),
+                                })
+                            }
                             busy={busy}
                         />
                     ) : filtering ? (
                         <EmptyState
                             icon={FileSearch}
                             title="No consents match these filters"
-                            description="Try a shorter part of the GUID, another version or a wider date range."
+                            description="Try a shorter part of the GUID, another version or status, or a wider date range."
                             action={
                                 <Button variant="outline" onClick={reset}>
                                     Clear filters

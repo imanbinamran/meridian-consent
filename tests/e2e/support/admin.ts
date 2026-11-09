@@ -1,6 +1,6 @@
-import { expect } from '@playwright/test';
+import { devices, expect } from '@playwright/test';
 import type { Browser, Locator, Page } from '@playwright/test';
-import { acceptConsent } from './consent';
+import { acceptConsent, declineConsent, waitForPublicPage } from './consent';
 
 /** Signed-in admin session saved by auth.setup.ts (gitignored). */
 export const ADMIN_STORAGE_STATE = 'playwright/.auth/admin.json';
@@ -44,22 +44,46 @@ export async function searchGuid(page: Page, guid: string): Promise<void> {
     await expect(page).toHaveURL(new RegExp(guid));
 }
 
+/** A fixed browser, so tests know what the Device column should say. */
+export const VISITOR_DEVICE = 'Desktop · Chrome on Windows';
+
 /**
  * Accept the consent box as a brand-new visitor in a throwaway context and
- * return the GUID from their cookie.
+ * return the GUID from their cookie. With `withdraw`, they then change their
+ * mind through Cookie settings, as a real visitor would.
  */
 export async function acceptAsNewVisitor(
     browser: Browser,
     baseURL: string | undefined,
+    { withdraw = false }: { withdraw?: boolean } = {},
 ): Promise<string> {
-    const context = await browser.newContext({ baseURL });
+    const context = await browser.newContext({
+        baseURL,
+        userAgent: devices['Desktop Chrome'].userAgent,
+    });
     const page = await context.newPage();
 
     try {
         await page.goto('/');
+        const { guid } = await acceptConsent(page);
 
-        return (await acceptConsent(page)).guid;
+        if (withdraw) {
+            await waitForPublicPage(page);
+            await page
+                .getByRole('contentinfo')
+                .getByRole('button', { name: 'Cookie settings' })
+                .click();
+            await declineConsent(page);
+        }
+
+        return guid;
     } finally {
         await context.close();
     }
+}
+
+/** Pick an option in the shadcn status filter on /admin/consents. */
+export async function chooseStatus(page: Page, option: string): Promise<void> {
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
 }

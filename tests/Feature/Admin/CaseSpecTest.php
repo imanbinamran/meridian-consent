@@ -152,7 +152,7 @@ test('ADM-031 the export with a version filter only contains that version', func
     $lines = array_values(array_filter(explode("\n", $response->streamedContent())));
 
     expect($lines)->toHaveCount(6)
-        ->and($lines[0])->toBe('guid,version,accepted_at_utc');
+        ->and($lines[0])->toBe('guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family');
 
     foreach (array_slice($lines, 1) as $line) {
         [$guid, $version, $acceptedAt] = str_getcsv($line, escape: '');

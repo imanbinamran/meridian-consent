@@ -17,8 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // The consent cookies are left readable on purpose: they hold no secret,
+        // The consent cookies are left unencrypted on purpose: they hold no secret,
         // and a visitor (or a reviewer in DevTools) can see exactly what we keep.
+        // They are HttpOnly, so page scripts cannot read them.
         $middleware->encryptCookies(except: [
             'appearance',
             'sidebar_state',
