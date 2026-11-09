@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { BackToTop } from '@/components/back-to-top';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -28,6 +29,7 @@ void createInertiaApp({
         return (
             <TooltipProvider delayDuration={0}>
                 {app}
+                <BackToTop />
                 <Toaster />
             </TooltipProvider>
         );

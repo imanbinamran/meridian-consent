@@ -21,8 +21,6 @@ export default function Login({ status, canResetPassword }: Props) {
         <>
             <Head title="Log in" />
 
-            <PasskeyVerify />
-
             <Form
                 {...store.form()}
                 resetOnSuccess={['password']}
@@ -93,6 +91,8 @@ export default function Login({ status, canResetPassword }: Props) {
                     </>
                 )}
             </Form>
+
+            <PasskeyVerify separator="Or" placement="after" />
 
             {status && (
                 <div className="mb-4 text-center text-sm font-medium text-green-600">

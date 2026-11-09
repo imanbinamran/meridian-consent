@@ -12,6 +12,7 @@ import type { NavItem } from '@/types';
 export function NavFooter({
     items,
     className,
+    children,
     ...props
 }: ComponentPropsWithoutRef<typeof SidebarGroup> & {
     items: NavItem[];
@@ -45,6 +46,7 @@ export function NavFooter({
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     ))}
+                    {children}
                 </SidebarMenu>
             </SidebarGroupContent>
         </SidebarGroup>

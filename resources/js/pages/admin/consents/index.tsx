@@ -1,6 +1,10 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Download, FileSearch, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import {
+    ConsentFeedFooter,
+    useConsentFeed,
+} from '@/components/admin/consent-feed';
 import { ConsentFilters } from '@/components/admin/consent-filters';
 import { DEFAULT_SORT } from '@/components/admin/consent-sort';
 import { ConsentsList } from '@/components/admin/consents-list';
@@ -97,6 +101,12 @@ export default function ConsentsIndex({
             query: toQuery(filters, consents.current_page),
         });
 
+    const feed = useConsentFeed(
+        consents,
+        (page) => index.url({ query: toQuery(filters, page) }),
+        RELOAD,
+    );
+
     const errorMessages = Object.values(errors ?? {});
 
     return (
@@ -149,15 +159,27 @@ export default function ConsentsIndex({
                     onReset={reset}
                 />
 
-                <Card className="gap-0 overflow-hidden py-0">
+                {/* Below the table's width the list runs edge to edge, no card. */}
+                <Card className="gap-0 overflow-hidden py-0 @max-4xl/consents:-mx-4 @max-4xl/consents:rounded-none @max-4xl/consents:border-y @max-4xl/consents:bg-transparent @max-4xl/consents:shadow-none @max-4xl/consents:ring-0 @max-4xl/consents:md:-mx-6">
                     {consents.data.length > 0 ? (
                         <>
                             <div className="@4xl/consents:hidden">
                                 <ConsentsList
-                                    rows={consents.data}
+                                    rows={feed.rows}
                                     timeZone={timezone}
-                                    recordUrl={recordUrl}
+                                    recordUrl={(guid) =>
+                                        show.url(guid, {
+                                            query: toQuery(filters),
+                                        })
+                                    }
                                     busy={busy}
+                                />
+                                <ConsentFeedFooter
+                                    shown={feed.rows.length}
+                                    total={consents.total}
+                                    hasMore={feed.hasMore}
+                                    status={feed.status}
+                                    onLoadMore={feed.loadMore}
                                 />
                             </div>
                             <div className="hidden @4xl/consents:block">
@@ -207,17 +229,19 @@ export default function ConsentsIndex({
                     )}
                 </Card>
 
-                <TablePagination
-                    currentPage={consents.current_page}
-                    lastPage={consents.last_page}
-                    total={consents.total}
-                    from={consents.from}
-                    to={consents.to}
-                    pageUrl={(page) =>
-                        index.url({ query: toQuery(filters, page) })
-                    }
-                    only={RELOAD}
-                />
+                <div className="hidden @4xl/consents:block">
+                    <TablePagination
+                        currentPage={consents.current_page}
+                        lastPage={consents.last_page}
+                        total={consents.total}
+                        from={consents.from}
+                        to={consents.to}
+                        pageUrl={(page) =>
+                            index.url({ query: toQuery(filters, page) })
+                        }
+                        only={RELOAD}
+                    />
+                </div>
             </div>
         </>
     );

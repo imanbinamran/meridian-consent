@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { rememberFeedPlace } from './consent-feed';
 import { formatDateTime, formatDevice } from './format';
 import { StatusBadge } from './status-badge';
 import type { ConsentRow } from './types';
@@ -26,14 +27,18 @@ export function ConsentsList({
             aria-label="Consents"
             aria-busy={busy}
             className={cn(
-                'divide-y transition-opacity duration-150 ease-out',
+                'transition-opacity duration-150 ease-out',
                 busy && 'opacity-50',
             )}
         >
             {rows.map((row) => (
-                <li key={row.id}>
+                <li
+                    key={row.id}
+                    className="relative not-first:before:absolute not-first:before:inset-x-4 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border"
+                >
                     <Link
                         href={recordUrl(row.guid)}
+                        onClick={rememberFeedPlace}
                         className="flex min-h-11 items-center gap-2 px-4 py-3 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:bg-muted/50"
                     >
                         <div className="grid min-w-0 flex-1 gap-1.5">
