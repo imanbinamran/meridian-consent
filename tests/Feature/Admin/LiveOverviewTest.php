@@ -328,6 +328,7 @@ describe('what the overview page is told', function () {
         $response = $this->get(route('dashboard'));
 
         $response->assertInertia(fn (Assert $page) => $page->where('realtime', [
+            'service' => 'reverb',
             'key' => 'public-key',
             'host' => '127.0.0.1',
             'port' => 8080,

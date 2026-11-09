@@ -76,11 +76,12 @@ class OverviewController extends Controller
     }
 
     /**
-     * What the browser needs to reach Reverb, or null when live updates are
-     * off. It comes from the server, not a VITE_ variable, so turning them on
-     * needs no rebuild. The app key and host are public; the secret stays here.
+     * What the browser needs to reach the socket service, or null when live
+     * updates are off. It comes from the server, not a VITE_ variable, so
+     * turning them on needs no rebuild. The app key, cluster and host are
+     * public; the secret and app id stay here.
      *
-     * @return array{key: string, host: string, port: int, scheme: string, channel: string, event: string}|null
+     * @return array{service: 'reverb'|'pusher', key: string, cluster?: string, host?: string, port?: int, scheme?: string, channel: string, event: string}|null
      */
     private function realtime(): ?array
     {
@@ -88,15 +89,58 @@ class OverviewController extends Controller
             return null;
         }
 
+        $target = config('broadcasting.default') === 'pusher'
+            ? $this->pusherTarget()
+            : $this->reverbTarget();
+
+        return [
+            ...$target,
+            'channel' => ConsentsChanged::CHANNEL,
+            'event' => ConsentsChanged::NAME,
+        ];
+    }
+
+    /**
+     * @return array{service: 'reverb', key: string, host: string, port: int, scheme: string}
+     */
+    private function reverbTarget(): array
+    {
         $reverb = config('broadcasting.connections.reverb');
 
         return [
+            'service' => 'reverb',
             'key' => (string) $reverb['key'],
             'host' => (string) $reverb['options']['host'],
             'port' => (int) $reverb['options']['port'],
             'scheme' => (string) $reverb['options']['scheme'],
-            'channel' => ConsentsChanged::CHANNEL,
-            'event' => ConsentsChanged::NAME,
+        ];
+    }
+
+    /**
+     * Hosted Pusher needs only the key and cluster. The host, port and scheme
+     * are sent only when PUSHER_HOST points the connection at another server.
+     *
+     * @return array{service: 'pusher', key: string, cluster: string, host?: string, port?: int, scheme?: string}
+     */
+    private function pusherTarget(): array
+    {
+        $pusher = config('broadcasting.connections.pusher');
+
+        $target = [
+            'service' => 'pusher',
+            'key' => (string) $pusher['key'],
+            'cluster' => (string) $pusher['options']['cluster'],
+        ];
+
+        if (blank($pusher['custom_host'])) {
+            return $target;
+        }
+
+        return [
+            ...$target,
+            'host' => (string) $pusher['custom_host'],
+            'port' => (int) $pusher['options']['port'],
+            'scheme' => (string) $pusher['options']['scheme'],
         ];
     }
 

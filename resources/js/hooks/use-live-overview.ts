@@ -7,6 +7,8 @@ export type LiveStatus = 'off' | 'connecting' | 'live' | 'disconnected';
 
 const REFETCH_GAP_MS = 2000;
 
+const SOCKET_TRANSPORTS: ['ws', 'wss'] = ['ws', 'wss'];
+
 /**
  * Refetch the overview's numbers. The visit is asynchronous so it neither
  * cancels nor is cancelled by a link the admin clicks. If it fails the page
@@ -39,7 +41,10 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
         realtime ? 'connecting' : 'off',
     );
 
+    const service = realtime?.service;
     const key = realtime?.key;
+    const cluster =
+        realtime?.service === 'pusher' ? realtime.cluster : undefined;
     const host = realtime?.host;
     const port = realtime?.port;
     const scheme = realtime?.scheme;
@@ -48,11 +53,13 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
 
     useEffect(() => {
         if (
+            service === undefined ||
             key === undefined ||
-            host === undefined ||
-            port === undefined ||
             channelName === undefined ||
-            eventName === undefined
+            eventName === undefined ||
+            (service === 'reverb' &&
+                (host === undefined || port === undefined)) ||
+            (service === 'pusher' && cluster === undefined)
         ) {
             return;
         }
@@ -71,16 +78,33 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
                 return;
             }
 
-            const echo = new Echo({
-                broadcaster: 'reverb',
-                key,
-                wsHost: host,
-                wsPort: port,
-                wssPort: port,
-                forceTLS: scheme === 'https',
-                enabledTransports: ['ws', 'wss'],
-                Pusher,
-            });
+            // Hosted Pusher picks its own address from the cluster.
+            const address =
+                host !== undefined && port !== undefined
+                    ? {
+                          wsHost: host,
+                          wsPort: port,
+                          wssPort: port,
+                          forceTLS: scheme === 'https',
+                          enabledTransports: SOCKET_TRANSPORTS,
+                      }
+                    : { forceTLS: true };
+
+            const echo =
+                service === 'pusher'
+                    ? new Echo({
+                          broadcaster: 'pusher',
+                          key,
+                          cluster,
+                          ...address,
+                          Pusher,
+                      })
+                    : new Echo({
+                          broadcaster: 'reverb',
+                          key,
+                          ...address,
+                          Pusher,
+                      });
 
             let subscribedBefore = false;
 
@@ -126,7 +150,7 @@ export function useLiveOverview(realtime: RealtimeConfig | null): LiveStatus {
             refetch.stop();
             closeSocket?.();
         };
-    }, [key, host, port, scheme, channelName, eventName]);
+    }, [service, key, cluster, host, port, scheme, channelName, eventName]);
 
     return status;
 }
