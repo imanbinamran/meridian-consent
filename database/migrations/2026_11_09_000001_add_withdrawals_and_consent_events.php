@@ -22,6 +22,13 @@ return new class extends Migration
             });
         }
 
+        // The admin status filter reads this column, on every consent row.
+        if (! Schema::hasIndex('consents', ['withdrawn_at'])) {
+            Schema::table('consents', function (Blueprint $table) {
+                $table->index('withdrawn_at');
+            });
+        }
+
         if (! Schema::hasTable('consent_events')) {
             Schema::create('consent_events', function (Blueprint $table) {
                 $table->id();
@@ -46,6 +53,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('consent_events');
+
+        if (Schema::hasIndex('consents', ['withdrawn_at'])) {
+            Schema::table('consents', function (Blueprint $table) {
+                $table->dropIndex(['withdrawn_at']);
+            });
+        }
 
         Schema::table('consents', function (Blueprint $table) {
             $table->dropColumn('withdrawn_at');

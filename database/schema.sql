@@ -61,7 +61,8 @@ CREATE TABLE `consents` (
   `os_family` varchar(16) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `consents_guid_unique` (`guid`),
-  KEY `consents_accepted_at_index` (`accepted_at`)
+  KEY `consents_accepted_at_index` (`accepted_at`),
+  KEY `consents_withdrawn_at_index` (`withdrawn_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

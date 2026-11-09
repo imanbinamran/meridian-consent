@@ -234,6 +234,11 @@ it('adds no second accepted event when the migration runs again', function () {
         ->and(ConsentEvent::query()->where('guid', $first->guid)->pluck('type')->all())->toBe(['accepted']);
 });
 
+// CON-092
+it('indexes the withdrawn column', function () {
+    expect(Schema::hasIndex('consents', ['withdrawn_at']))->toBeTrue();
+});
+
 // CON-086
 it('gives every demo consent an audit trail, with some withdrawn', function () {
     $this->seed(ConsentDemoSeeder::class);
