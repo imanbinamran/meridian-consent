@@ -505,6 +505,23 @@ test.describe('privacy statement', () => {
         await expect(main).toContainText('mark your record in our database as');
         await expect(main).not.toContainText('IP address or device');
     });
+
+    test('CON-093 says the session record exists and claims nothing it cannot back up', async ({
+        page,
+    }) => {
+        await page.goto('/privacy');
+        const main = page.locator('body');
+
+        await expect(main).toContainText('session record in our database');
+        await expect(main).toContainText('browser header (user agent)');
+        await expect(main).toContainText(
+            'This session record is separate from your consent record',
+        );
+        await expect(main).toContainText('work out the broad device details');
+        await expect(main).not.toContainText('we keep only the time');
+        await expect(main).not.toContainText('could identify you');
+        await expect(main).not.toContainText('only to deliver the site');
+    });
 });
 
 test.describe('cookie settings', () => {
