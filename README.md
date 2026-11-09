@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  A four-page news site with a cookie consent gate, and an admin portal that shows every consent.
+  A news site with four core pages, five readable stories, a cookie consent gate, and an admin portal that shows every consent.
 </p>
 
 <p align="center">
@@ -21,8 +21,8 @@
   <img alt="Inertia 3" src="https://img.shields.io/badge/Inertia-3-9553E9?logo=inertia&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="MySQL 8.4" src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white">
-  <img alt="Pest: 273 tests" src="https://img.shields.io/badge/Pest-273%20tests-F28D1A">
-  <img alt="Playwright: 105 tests" src="https://img.shields.io/badge/Playwright-105%20tests-2EAD33">
+  <img alt="Pest: 284 tests" src="https://img.shields.io/badge/Pest-284%20tests-F28D1A">
+  <img alt="Playwright: 137 tests" src="https://img.shields.io/badge/Playwright-137%20tests-2EAD33">
 </p>
 
 <p align="center">
@@ -70,6 +70,8 @@ Every case ID below is written up in [`tests/cases/`](tests/cases), with the bri
     - browser and device breakdowns on the overview
     - the database check that stops forged cookies
     - HttpOnly on both cookies
+    - five readable sample stories at `/stories/{slug}`, behind the same consent gate (STR-001 to STR-022)
+    - a live admin overview over Laravel Reverb, off until it's switched on (ADM-055 to ADM-060)
 
 ## See it work
 
@@ -252,8 +254,8 @@ The table badge, the record page, the status filter and the CSV all use the same
 
 Last full run on 9 Nov 2026: every test below passed, apart from the one real-Reverb test that is skipped by default.
 
-- **Pest:** 273 tests (1,895 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
-- **Playwright:** 105 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
+- **Pest:** 284 tests (2,004 assertions) cover every consent rule, the admin portal, live updates and the stories. Time travel checks the 1-year and 1-day expiry.
+- **Playwright:** 137 tests cover consent, scroll lock, accessibility (axe), phone layout, the article pages, the live overview and the admin in desktop Chrome. The consent, phone-layout and article tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
 - **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
 
@@ -275,7 +277,7 @@ app/Http/Middleware/        shares the consent state with every public page
 app/Http/Controllers/       consent accept and decline, admin overview, table and record page
 app/Events/                 the "consents changed" broadcast
 routes/channels.php         who may listen to it
-resources/js/pages/site/    the four public pages
+resources/js/pages/site/    the four public pages and the story page
 resources/js/pages/admin/   admin overview, consents table and record page
 config/consent.php          version, cookie names, lifetimes, rate limit
 database/schema.sql         the schema as plain SQL

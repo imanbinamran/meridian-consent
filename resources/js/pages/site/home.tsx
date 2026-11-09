@@ -5,30 +5,11 @@ import {
     MeridianLines,
     SectionHeading,
 } from '@/components/site/section-heading';
+import { Headline } from '@/components/site/story/headline';
+import { canResume } from '@/components/site/story/reading-store';
+import { StoryLink, useReadingEntry } from '@/components/site/story/story-link';
+import type { StorySummary } from '@/components/site/story/types';
 import { about } from '@/routes';
-
-const edition = [
-    {
-        desk: 'Business',
-        title: "Why Penang's chip boom is finally reaching the factory floor",
-        minutes: 6,
-    },
-    {
-        desk: 'Nation',
-        title: 'Flood season, explained: what has changed since the 2021 floods',
-        minutes: 8,
-    },
-    {
-        desk: 'Food',
-        title: 'The quiet return of the neighbourhood kopitiam',
-        minutes: 4,
-    },
-    {
-        desk: 'Culture',
-        title: 'Inside the Ipoh studio reviving hand-painted cinema posters',
-        minutes: 5,
-    },
-];
 
 const desks = [
     {
@@ -85,7 +66,76 @@ const principles = [
     },
 ];
 
-export default function Home() {
+function EditionRow({
+    story,
+    number,
+}: {
+    story: StorySummary;
+    number: number;
+}) {
+    const entry = useReadingEntry(story.slug);
+    const resumable = canResume(entry);
+
+    return (
+        <li>
+            <StoryLink
+                slug={story.slug}
+                resume={resumable}
+                className="group relative flex gap-5 py-5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+                <span
+                    aria-hidden="true"
+                    className="font-display text-4xl leading-none font-medium text-brand/80 tabular-nums"
+                >
+                    {number}
+                </span>
+                <span className="min-w-0">
+                    <span className="block text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                        {story.desk}
+                        <span className="sr-only"> desk</span>
+                    </span>
+                    <span className="mt-1.5 block font-display text-lg leading-snug font-medium text-pretty decoration-brand decoration-1 underline-offset-4 group-hover:underline">
+                        <Headline text={story.title} />
+                    </span>
+                    <span className="mt-1.5 block text-xs text-muted-foreground">
+                        {story.minutes} min read
+                        {resumable && (
+                            <span className="font-medium text-brand">
+                                {' '}
+                                ·{' '}
+                                {Math.max(
+                                    1,
+                                    Math.ceil(
+                                        (1 - entry.progress) * story.minutes,
+                                    ),
+                                )}{' '}
+                                min left, pick up where you left off
+                            </span>
+                        )}
+                        {entry?.finished && (
+                            <span className="font-medium"> · Read</span>
+                        )}
+                    </span>
+                </span>
+                {resumable && (
+                    <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 -bottom-px h-0.5 origin-left bg-primary rtl:origin-right"
+                        style={{ transform: `scaleX(${entry.progress})` }}
+                    />
+                )}
+            </StoryLink>
+        </li>
+    );
+}
+
+export default function Home({
+    edition,
+    longRead,
+}: {
+    edition: StorySummary[];
+    longRead: StorySummary;
+}) {
     return (
         <>
             <Head title="Malaysian news and lifestyle, told with care">
@@ -139,8 +189,9 @@ export default function Home() {
                     </div>
 
                     <aside
+                        id="edition"
                         aria-labelledby="edition-title"
-                        className="lg:col-span-5 lg:border-s lg:border-foreground/10 lg:ps-10"
+                        className="scroll-mt-32 lg:col-span-5 lg:border-s lg:border-foreground/10 lg:ps-10"
                     >
                         <h2
                             id="edition-title"
@@ -153,32 +204,11 @@ export default function Home() {
                         </h2>
                         <ol className="divide-y divide-foreground/10">
                             {edition.map((story, index) => (
-                                <li
-                                    key={story.title}
-                                    className="flex gap-5 py-5"
-                                >
-                                    <span
-                                        aria-hidden="true"
-                                        className="font-display text-4xl leading-none font-medium text-brand/80 tabular-nums"
-                                    >
-                                        {index + 1}
-                                    </span>
-                                    <div>
-                                        <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                                            {story.desk}
-                                            <span className="sr-only">
-                                                {' '}
-                                                desk
-                                            </span>
-                                        </p>
-                                        <p className="mt-1.5 font-display text-lg leading-snug font-medium text-pretty">
-                                            {story.title}
-                                        </p>
-                                        <p className="mt-1.5 text-xs text-muted-foreground">
-                                            {story.minutes} min read
-                                        </p>
-                                    </div>
-                                </li>
+                                <EditionRow
+                                    key={story.slug}
+                                    story={story}
+                                    number={index + 1}
+                                />
                             ))}
                         </ol>
                     </aside>
@@ -232,12 +262,15 @@ export default function Home() {
                             id="longread-title"
                             className="mt-5 font-display text-4xl leading-[1.08] font-medium tracking-tight text-balance sm:text-5xl"
                         >
-                            Kampung to cloud: the quiet digitisation of rural
-                            Sabah
+                            <StoryLink
+                                slug={longRead.slug}
+                                className="rounded-sm decoration-brand-bright decoration-2 underline-offset-[6px] hover:underline focus-visible:ring-2 focus-visible:ring-brand-bright focus-visible:ring-offset-4 focus-visible:ring-offset-ink focus-visible:outline-none"
+                            >
+                                <Headline text={longRead.title} />
+                            </StoryLink>
                         </h2>
                         <p className="mt-5 text-sm text-ink-foreground/70">
-                            By Joanna Gimbang, East Malaysia bureau · 18 min
-                            read
+                            {longRead.byline} · {longRead.minutes} min read
                         </p>
                     </div>
                     <div className="lg:col-span-7 lg:ps-6">
