@@ -31,6 +31,11 @@ sources:
           kind: chat,
           ref: 'Brief to show consent records in the admin portal (status, device, record detail, CSV columns, overview breakdowns)',
       }
+    - {
+          id: S5,
+          kind: chat,
+          ref: 'Brief to make the admin overview update live with Laravel Reverb (real changes only, private channel, failure never reaches a visitor, throttled refetch, indicator)',
+      }
 
 requirements:
     - id: REQ-1
@@ -113,6 +118,30 @@ requirements:
     - id: REQ-20
       text: A consent past its 365-day lifetime or on an older notice version reads Expired in the badge, record page, status filter and CSV; Withdrawn wins over Expired
       anchor: 'S3 config/consent.php'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-21
+      text: The overview's stats, chart and recent list update on their own when a consent is accepted, declined or withdrawn
+      anchor: 'S5 subscribe and refetch'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-22
+      text: Only a real change is announced, never a repeat, and the announcement holds no GUID, IP or device data
+      anchor: 'S5 real changes only; payload'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-23
+      text: Only a signed-in admin with a verified email can join the channel
+      anchor: 'S5 private channel, same gate as routes/admin.php'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-24
+      text: A broadcasting failure never stops a visitor's choice being saved or the cookie being set
+      anchor: 'S5 broadcast failure must never break accepting or declining'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-25
+      text: The header says whether the page is live, in words, and the page works normally when the socket is down or not set up
+      anchor: 'S5 Live indicator, disconnected state, works without Echo'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-26
+      text: Bursts of changes cause at most one refetch every 2 seconds, and the last change is always fetched
+      anchor: 'S5 throttle, trailing edge'
       risk: { impact: 2, likelihood: 2 }
 
 scope:
@@ -1248,3 +1277,240 @@ cases:
       cleanup: 'Rolled back by RefreshDatabase; the seeded row stays'
       tags: [pest, e2e]
       notes: 'ConsentStatusTest.php and admin.spec.ts. ADM-053 runs the axe check on the Expired badge.'
+
+    - id: ADM-055
+      title: An accept in one browser updates the overview open in another, with no reload
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: happy_path
+      required: false
+      mutates: test_data
+      requirement_refs: [REQ-21]
+      role: admin
+      preconditions:
+          [
+              'Logged in as admin',
+              'Reverb and a queue worker running with BROADCAST_CONNECTION=reverb',
+              'E2E_REVERB=1',
+          ]
+      steps:
+          - Open /admin and wait for Live
+          - In a second browser context, accept the consent box as a new visitor
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Live update,
+                expected: 'Total accepted goes up on the open overview without a page load',
+                provenance: REQ-21,
+            }
+      cleanup: 'none needed: see Fixture F3'
+      tags: [e2e]
+      notes: 'live-overview.spec.ts. Skipped unless E2E_REVERB=1, so CI needs no Reverb server. ADM-059 covers the same refetch with a fake socket.'
+
+    - id: ADM-056
+      title: Only a real change is announced, and it says nothing about the visitor
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: data_integrity
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-22]
+      role: guest
+      preconditions: ['Events faked, or a stand-in broadcaster for the payload']
+      steps:
+          - POST accept and decline as a new visitor, and decline holding a recorded cookie
+          - Repeat each - accept with the cookie just issued, decline with the declined cookie, decline again with an already withdrawn cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Real changes,
+                expected: 'A new acceptance, a newly counted decline and a withdrawal that marks a row each dispatch exactly one event',
+                provenance: REQ-22,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Repeats,
+                expected: 'A second Accept, a repeat decline, a repeat withdrawal and a page view dispatch nothing',
+                provenance: REQ-22,
+            }
+          - {
+                id: A3,
+                kind: state,
+                description: Payload,
+                expected: 'The broadcast goes to private-admin.consents with an empty payload: no GUID, IP, browser or OS',
+                provenance: REQ-22,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-057
+      title: The live channel refuses anyone but a verified admin
+      type: api
+      scenario_class: authz_negative
+      priority: P1
+      technique: authz
+      required: true
+      mutates: none
+      requirement_refs: [REQ-23]
+      role: guest
+      preconditions:
+          [
+              'The real Reverb driver with made-up credentials; signing needs no server',
+          ]
+      steps:
+          - POST /broadcasting/auth for private-admin.consents as a guest, as an unverified user and as a verified user
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Signed out,
+                expected: 'A guest gets 403',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Unverified,
+                expected: 'A signed-in user with an unverified email gets 403',
+                provenance: REQ-23,
+            }
+          - {
+                id: A3,
+                kind: api,
+                description: Verified,
+                expected: 'A verified user gets 200 and a signature',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-058
+      title: Accepting, declining and withdrawing still work with Reverb down
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-24]
+      role: guest
+      preconditions:
+          ['Broadcasts run inside the request (sync queue), the worst case']
+      steps:
+          - Make the broadcaster throw, then point Reverb at a closed port, then make the queue unreachable
+          - For each, POST accept, decline, and decline holding a recorded cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Choice saved,
+                expected: 'The row is written, or marked withdrawn, and the visitor is redirected as normal',
+                provenance: REQ-24,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: Cookie set,
+                expected: 'The accepted or declined cookie is on the response, and the accepted cookie carries the saved GUID',
+                provenance: REQ-24,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'LiveOverviewTest.php.'
+
+    - id: ADM-059
+      title: The header says whether the overview is live, and the page works without a socket
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-21, REQ-25]
+      role: admin
+      preconditions:
+          [
+              'Logged in as admin',
+              'A fake socket in the browser; no Reverb server',
+          ]
+      steps:
+          - Open /admin with a socket that subscribes, announce a change after a new acceptance
+          - Drop the socket, then let it back
+          - Open /admin with nothing listening, and again with live updates not set up
+          - Leave the page
+          - Repeat the Live and Disconnected states at 320px in light and dark mode
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Live,
+                expected: "'Live' shows in a polite status region and an announced change updates the numbers with a partial reload of stats, chart and recent",
+                provenance: REQ-21,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Dropped,
+                expected: "'Disconnected' shows, in words, while the numbers stay on screen. On reconnect it returns to 'Live' and refetches once",
+                provenance: REQ-25,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Not set up,
+                expected: 'No indicator, no socket opened, no page error, and the overview renders',
+                provenance: REQ-25,
+            }
+          - {
+                id: A4,
+                kind: ui,
+                description: Layout and axe,
+                expected: 'No horizontal scroll at 320px and no serious or critical axe violations in either state or theme',
+                provenance: REQ-25,
+            }
+      cleanup: 'none needed: see Fixture F3'
+      tags: [e2e]
+      notes: 'live-overview.spec.ts.'
+
+    - id: ADM-060
+      title: Bursts of changes refetch at most every 2 seconds and never lose the last one
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: boundary
+      required: true
+      mutates: none
+      requirement_refs: [REQ-26]
+      role: admin
+      preconditions:
+          [
+              'Logged in as admin',
+              'A fake socket in the browser; no Reverb server',
+          ]
+      steps:
+          - Announce 10 changes in about half a second
+          - Announce a change while a slowed refetch is still running
+      assertions:
+          - {
+                id: A1,
+                kind: api,
+                description: Throttle,
+                expected: 'Exactly two refetches, at least about 2 seconds apart, the second after the burst ended',
+                provenance: REQ-26,
+            }
+          - {
+                id: A2,
+                kind: api,
+                description: No overlap,
+                expected: 'The next refetch starts only after the slow one ends, and two never run at once',
+                provenance: REQ-26,
+            }
+      tags: [e2e]
+      notes: 'live-overview.spec.ts.'
