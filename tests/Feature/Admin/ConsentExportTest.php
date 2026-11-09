@@ -73,6 +73,18 @@ test('the export follows the search and sort order', function () {
         ->and($lines[2])->toStartWith("{$b->guid},1,2026-11-02T00:00:00Z,");
 });
 
+test('ADM-068 the export follows the chosen column and a device search', function () {
+    $a = Consent::factory()->create(['version' => 1, 'device_type' => 'Desktop']);
+    $b = Consent::factory()->create(['version' => 2, 'device_type' => 'Desktop']);
+    Consent::factory()->create(['device_type' => 'Mobile']);
+
+    $lines = csvLines($this->get(route('admin.consents.export', ['search' => 'desktop', 'sort' => 'version']))->streamedContent());
+
+    expect($lines)->toHaveCount(3)
+        ->and($lines[1])->toStartWith("{$b->guid},2,")
+        ->and($lines[2])->toStartWith("{$a->guid},1,");
+});
+
 test('an export with bad filters goes back to the list with errors', function () {
     $this->get(route('admin.consents.export', ['version' => 'abc']))
         ->assertRedirect(route('admin.consents.index'))

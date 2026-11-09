@@ -16,6 +16,10 @@ class ConsentIndexRequest extends FormRequest
 {
     public const DIRECTIONS = ['desc', 'asc'];
 
+    public const DEFAULT_SORT = 'accepted_at';
+
+    public const SORTS = [self::DEFAULT_SORT, 'recorded_at', 'guid', 'version', 'status', 'device'];
+
     public function authorize(): bool
     {
         return true;
@@ -28,12 +32,13 @@ class ConsentIndexRequest extends FormRequest
     {
         return [
             // Free text, matched literally. Something that can't be part of a
-            // GUID simply finds nothing; it is not an error.
+            // GUID or a device detail simply finds nothing; it is not an error.
             'search' => ['nullable', 'string', 'max:100'],
             'version' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', Rule::in(Consent::STATUSES)],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'sort' => ['nullable', Rule::in(self::SORTS)],
             'direction' => ['nullable', Rule::in(self::DIRECTIONS)],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
@@ -61,7 +66,7 @@ class ConsentIndexRequest extends FormRequest
     /**
      * The validated filters, normalised, with empty values left out.
      *
-     * @return array{search?: string, version?: int, status?: string, from?: string, to?: string, direction: 'asc'|'desc'}
+     * @return array{search?: string, version?: int, status?: string, from?: string, to?: string, sort: string, direction: 'asc'|'desc'}
      */
     public function filters(): array
     {
@@ -73,6 +78,7 @@ class ConsentIndexRequest extends FormRequest
             'status' => $validated['status'] ?? null,
             'from' => $validated['from'] ?? null,
             'to' => $validated['to'] ?? null,
+            'sort' => $validated['sort'] ?? self::DEFAULT_SORT,
             'direction' => $validated['direction'] ?? 'desc',
         ], fn ($value) => $value !== null);
     }
@@ -85,11 +91,8 @@ class ConsentIndexRequest extends FormRequest
         $filters = $this->filters();
         $timezone = config('admin.timezone');
 
-        return Consent::query()
-            // Escape LIKE wildcards so "%" or "_" are matched as characters.
-            ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $query->whereLike('guid', '%'.addcslashes($search, '%_\\').'%');
-            })
+        $query = Consent::query()
+            ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query->whereMatchesSearch($search))
             ->when($filters['version'] ?? null, fn (Builder $query, int $version) => $query->where('version', $version))
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->whereStatus($status))
             // Dates are local days. Convert each edge to UTC for the query.
@@ -98,8 +101,18 @@ class ConsentIndexRequest extends FormRequest
             ))
             ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->where(
                 'accepted_at', '<', CarbonImmutable::parse($to, $timezone)->addDay()->startOfDay()->utc(),
-            ))
-            ->orderBy('accepted_at', $filters['direction'])
-            ->orderBy('id', $filters['direction']);
+            ));
+
+        match ($filters['sort']) {
+            'recorded_at' => $query->orderBy('created_at', $filters['direction']),
+            'guid' => $query->orderBy('guid', $filters['direction']),
+            'version' => $query->orderBy('version', $filters['direction']),
+            'status' => $query->orderByStatus($filters['direction']),
+            'device' => $query->orderByDevice($filters['direction']),
+            default => $query->orderBy('accepted_at', $filters['direction']),
+        };
+
+        // Rows that tie must keep one order, or they could repeat across pages.
+        return $query->orderBy('id', $filters['direction']);
     }
 }

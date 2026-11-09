@@ -169,6 +169,10 @@ requirements:
       text: A Pusher call that hangs gives up inside the job timeout, and missing Pusher settings never stop the app from booting
       anchor: 'S7 short timeouts; S6 failure never reaches a visitor'
       risk: { impact: 3, likelihood: 2 }
+    - id: REQ-31
+      text: Every consents column sorts on desktop and on a phone, and the search box also finds rows by device, browser or operating system
+      anchor: 'Product request, 9 Nov 2026'
+      risk: { impact: 3, likelihood: 2 }
 
 scope:
     in:
@@ -1860,3 +1864,61 @@ cases:
       cleanup: 'none needed: see Fixture F3'
       tags: [e2e]
       notes: 'live-overview.spec.ts. Skipped unless E2E_PUSHER_LOCAL=1, so CI needs no server and no Pusher account. Reverb speaks the Pusher protocol.'
+
+    - id: ADM-068
+      title: Every consents column sorts, by its header on desktop and the Sort chip on a phone
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: state_transition
+      required: false
+      mutates: none
+      requirement_refs: [REQ-31]
+      role: admin
+      preconditions: ['Logged in as admin', 'Demo consents seeded']
+      steps:
+          - Click the GUID header on desktop, then click it again
+          - At 375px and 320px, open the Sort chip, choose Version and Lowest first, and apply
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Header sort,
+                expected: 'The URL carries sort=guid, only the GUID header reports aria-sort, and a second click flips it',
+                provenance: REQ-31,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Phone sort,
+                expected: 'The URL carries sort=version and direction=asc, and the chip reads Version: Lowest first',
+                provenance: REQ-31,
+            }
+      cleanup: 'none needed: read only'
+      tags: [e2e, pest]
+      notes: 'admin.spec.ts for the screens. ConsentIndexTest.php and ConsentExportTest.php prove each column order, tie breaks, page links and the export.'
+
+    - id: ADM-069
+      title: The consents search finds rows by device, browser or operating system
+      type: web
+      scenario_class: flow
+      priority: P1
+      technique: equivalence_partitioning
+      required: false
+      mutates: none
+      requirement_refs: [REQ-31]
+      role: admin
+      preconditions: ['Logged in as admin', 'Demo consents seeded']
+      steps:
+          - Type desktop in the search box on /admin/consents
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Device search,
+                expected: 'The URL carries search=desktop and every row shown says Desktop',
+                provenance: REQ-31,
+            }
+      cleanup: 'none needed: read only'
+      tags: [e2e, pest]
+      notes: 'admin.spec.ts. ConsentIndexTest.php proves partial words, two words, the text as the table shows it, Unknown and that GUID search still works.'

@@ -490,6 +490,26 @@ test.describe('as the admin', () => {
                 await expect(listRows(page).first()).toContainText(guid);
             });
 
+            test('ADM-068 the Sort chip sorts by any column', async ({
+                page,
+            }) => {
+                await page.goto('/admin/consents');
+
+                await page.getByRole('button', { name: /^Sort/ }).tap();
+                const sheet = page.getByRole('dialog', { name: 'Sort' });
+                await sheet.getByRole('radio', { name: 'Version' }).tap();
+                await sheet.getByRole('radio', { name: 'Lowest first' }).tap();
+                await sheet.getByRole('button', { name: 'Apply' }).tap();
+
+                await expect(page).toHaveURL(/sort=version/);
+                await expect(page).toHaveURL(/direction=asc/);
+                await expect(
+                    page.getByRole('button', {
+                        name: 'Sort: Version: Lowest first',
+                    }),
+                ).toBeVisible();
+            });
+
             test('ADM-055 Reset leaves the empty state and clears the search', async ({
                 page,
             }) => {
@@ -506,6 +526,41 @@ test.describe('as the admin', () => {
             });
         });
     }
+
+    test('ADM-068 a column header sorts by that column and flips', async ({
+        page,
+    }) => {
+        await page.goto('/admin/consents');
+        const guid = page.getByRole('columnheader', { name: /GUID/ });
+        const accepted = page.getByRole('columnheader', {
+            name: /Accepted at/,
+        });
+        await expect(accepted).toHaveAttribute('aria-sort', 'descending');
+
+        await guid.getByRole('button').click();
+        await expect(page).toHaveURL(/sort=guid/);
+        await expect(guid).toHaveAttribute('aria-sort', 'ascending');
+        await expect(accepted).not.toHaveAttribute('aria-sort', /.+/);
+
+        await guid.getByRole('button').click();
+        await expect(guid).toHaveAttribute('aria-sort', 'descending');
+    });
+
+    test('ADM-069 search finds rows by device', async ({ page }) => {
+        await page.goto('/admin/consents');
+
+        await guidSearch(page).fill('desktop');
+
+        await expect(page).toHaveURL(/search=desktop/);
+        const rows = page.getByRole('table').getByRole('row');
+        await expect(rows.nth(1)).toContainText('Desktop');
+        await expect(
+            page
+                .getByRole('table')
+                .locator('tbody tr')
+                .filter({ hasNotText: 'Desktop' }),
+        ).toHaveCount(0);
+    });
 
     test('ADM-055 the layout follows the content width, not the viewport', async ({
         page,

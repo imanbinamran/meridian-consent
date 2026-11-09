@@ -2,6 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Download, FileSearch, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConsentFilters } from '@/components/admin/consent-filters';
+import { DEFAULT_SORT } from '@/components/admin/consent-sort';
 import { ConsentsList } from '@/components/admin/consents-list';
 import { ConsentsTable } from '@/components/admin/consents-table';
 import { EmptyState } from '@/components/admin/empty-state';
@@ -38,6 +39,7 @@ function toQuery(filters: Filters, page?: number) {
         status: filters.status || undefined,
         from: filters.from || undefined,
         to: filters.to || undefined,
+        sort: filters.sort === DEFAULT_SORT ? undefined : filters.sort,
         direction: filters.direction === 'asc' ? 'asc' : undefined,
         page: page && page > 1 ? page : undefined,
     };
@@ -87,7 +89,8 @@ export default function ConsentsIndex({
     const update = (changes: Partial<Filters>) =>
         visit({ ...filters, ...changes });
 
-    const reset = () => visit({ direction: filters.direction });
+    const reset = () =>
+        visit({ sort: filters.sort, direction: filters.direction });
 
     const recordUrl = (guid: string) =>
         show.url(guid, {
@@ -161,9 +164,10 @@ export default function ConsentsIndex({
                                 <ConsentsTable
                                     rows={consents.data}
                                     timeZone={timezone}
+                                    sort={filters.sort}
                                     direction={filters.direction}
-                                    onSort={(direction) =>
-                                        update({ direction })
+                                    onSort={(sort, direction) =>
+                                        update({ sort, direction })
                                     }
                                     recordUrl={recordUrl}
                                     busy={busy}
@@ -174,7 +178,7 @@ export default function ConsentsIndex({
                         <EmptyState
                             icon={FileSearch}
                             title="No consents match these filters"
-                            description="Try a shorter part of the GUID, another version or status, or a wider date range."
+                            description="Try a shorter part of the GUID, another device, version or status, or a wider date range."
                             action={
                                 <>
                                     <Button
