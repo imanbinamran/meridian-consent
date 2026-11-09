@@ -202,7 +202,7 @@ What it doesn't do yet:
 - **A copied cookie still works.** A real, live cookie moved to another browser passes, because the GUID is the only proof.
 - **A hand-typed decline hides the box for up to a day.** Declines are anonymous, so there's no row to check. It records no consent.
 - **A database outage is a 500.** Sessions live in the database, so pages fail first. The fallbacks only help on another session driver, and a failed Decline is a 500 on any driver.
-- **The Terms and Privacy links open inside the box.** The brief links to those pages and also locks the page while the box is open, but doesn't say what happens after the click. A link that lands on a page the visitor can't read isn't much use, so the box becomes a reader at `/terms` or `/privacy`. Only the text scrolls, the page stays locked, and Accept and Decline stay in view. **Back to notice** returns to the required wording.
+- **The brief has a gap around the Terms and Privacy links.** It says the links go to those pages, and that the page can't scroll while the box is open. It doesn't say what happens after the click. Following both rules literally lands the visitor on a page they can't read. To fill the gap, the box becomes a reader at `/terms` or `/privacy`. Only the text scrolls, the page stays locked, and Accept and Decline stay in view. **Back to notice** returns to the required wording.
 - **Sessions still store IP and user agent.** That's Laravel's database session driver, for every visitor, including people who decline. The consent records hold neither.
 - **Any verified user is an admin.** That's safe only because registration is off.
 - **Phone checks ran in emulation.** Not on a real iPhone or Android yet.
