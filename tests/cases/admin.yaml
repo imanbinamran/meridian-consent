@@ -1345,6 +1345,13 @@ cases:
                 expected: 'The broadcast goes to private-admin.consents with an empty payload: no GUID, IP, browser or OS',
                 provenance: REQ-22,
             }
+          - {
+                id: A4,
+                kind: state,
+                description: Off means nothing queued,
+                expected: 'With BROADCAST_CONNECTION=log a real change adds no row to jobs; with Reverb on it adds exactly one',
+                provenance: REQ-22,
+            }
       cleanup: 'Rolled back by RefreshDatabase'
       tags: [pest]
       notes: 'LiveOverviewTest.php.'

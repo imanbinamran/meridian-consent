@@ -14,6 +14,8 @@ use Illuminate\Foundation\Events\Dispatchable;
  *
  * Queued, so a visitor's accept never waits on the socket server. It is a
  * nudge and worth nothing a few seconds later, so a failed send is not retried.
+ * With Reverb off nothing is queued at all, or a public form would fill the
+ * jobs table on an environment with no worker.
  */
 final class ConsentsChanged implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
@@ -26,6 +28,26 @@ final class ConsentsChanged implements ShouldBroadcast, ShouldDispatchAfterCommi
     public int $tries = 1;
 
     public int $timeout = 5;
+
+    /**
+     * Whether live updates are switched on and have somewhere to connect.
+     */
+    public static function liveUpdatesOn(): bool
+    {
+        $reverb = config('broadcasting.connections.reverb');
+
+        return config('broadcasting.default') === 'reverb'
+            && filled($reverb['key'])
+            && filled($reverb['options']['host']);
+    }
+
+    /**
+     * Checked by the event dispatcher before the broadcast job is queued.
+     */
+    public function broadcastWhen(): bool
+    {
+        return self::liveUpdatesOn();
+    }
 
     public function broadcastOn(): PrivateChannel
     {

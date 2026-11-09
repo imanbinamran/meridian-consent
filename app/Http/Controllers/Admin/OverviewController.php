@@ -84,11 +84,11 @@ class OverviewController extends Controller
      */
     private function realtime(): ?array
     {
-        $reverb = config('broadcasting.connections.reverb');
-
-        if (config('broadcasting.default') !== 'reverb' || blank($reverb['key']) || blank($reverb['options']['host'])) {
+        if (! ConsentsChanged::liveUpdatesOn()) {
             return null;
         }
+
+        $reverb = config('broadcasting.connections.reverb');
 
         return [
             'key' => (string) $reverb['key'],

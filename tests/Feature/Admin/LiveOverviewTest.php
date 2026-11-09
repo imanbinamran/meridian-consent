@@ -10,10 +10,10 @@ use App\Models\ConsentDecline;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Broadcasting\Broadcasters\Broadcaster;
-use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
@@ -56,9 +56,15 @@ function useBroadcaster(Closure $send): void
     });
 
     config([
-        'broadcasting.default' => 'stand-in',
-        'broadcasting.connections.stand-in' => ['driver' => 'stand-in'],
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb' => [
+            'driver' => 'stand-in',
+            'key' => 'public-key',
+            'options' => ['host' => '127.0.0.1'],
+        ],
     ]);
+
+    app(BroadcastManager::class)->forgetDrivers();
 }
 
 /**
@@ -160,12 +166,41 @@ describe('what gets announced', function () {
 });
 
 // ADM-056
-test('a change is queued, so the request never talks to the socket server', function () {
-    Queue::fake();
+describe('what reaches the queue, with the real dispatcher', function () {
+    beforeEach(fn () => config(['queue.default' => 'database']));
 
-    $this->post(route('consent.accept'));
+    $changes = [
+        'a new acceptance' => [fn () => test()->post(route('consent.accept'))],
+        'a newly counted decline' => [fn () => test()->post(route('consent.decline'))],
+        'a withdrawal' => [fn () => test()->withUnencryptedCookie('consent', recordedCookieValue())->post(route('consent.decline'))],
+    ];
 
-    Queue::assertPushed(BroadcastEvent::class, 1);
+    test('with broadcasting on the log, no job is queued', function (Closure $change) {
+        config(['broadcasting.default' => 'log']);
+
+        $change();
+
+        expect(DB::table('jobs')->count())->toBe(0);
+    })->with($changes);
+
+    test('with Reverb on but no key, no job is queued', function (Closure $change) {
+        useReverbDriver();
+        config(['broadcasting.connections.reverb.key' => null]);
+
+        $change();
+
+        expect(DB::table('jobs')->count())->toBe(0);
+    })->with($changes);
+
+    test('with Reverb on, exactly one job is queued and the request sends nothing itself', function (Closure $change) {
+        useReverbDriver(port: 1);
+
+        $change();
+
+        $job = json_decode(DB::table('jobs')->sole()->payload, true);
+
+        expect($job['displayName'])->toBe(ConsentsChanged::class);
+    })->with($changes);
 });
 
 test('a failed send is not retried and fails fast', function () {
@@ -203,6 +238,8 @@ describe('accepting and declining with broadcasting down', function () {
         'the broadcaster throws' => [fn () => useBroadcaster(fn () => throw new RuntimeException('Reverb is down.'))],
         'nothing is listening on the Reverb port' => [fn () => useReverbDriver(port: 1)],
         'the queue cannot be reached' => [function () {
+            useReverbDriver();
+
             Queue::extend('unreachable', fn () => new class implements ConnectorInterface
             {
                 public function connect(array $config): never
