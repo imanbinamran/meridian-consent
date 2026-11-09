@@ -3,6 +3,7 @@ import { footerNavItems, mainNavItems } from '@/components/admin/nav-items';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
+import { NavTheme } from '@/components/nav-theme';
 import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
@@ -35,7 +36,9 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavFooter items={footerNavItems} className="mt-auto">
+                    <NavTheme />
+                </NavFooter>
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 const THEME_COLORS = { light: '#ffffff', dark: '#0c0a09' } as const;
 
 /** Keep the phone's status bar in step with a manual theme switch. */
-function syncThemeColor(mode: keyof typeof THEME_COLORS): void {
+export function syncThemeColor(mode: keyof typeof THEME_COLORS): void {
     const metas = document.querySelectorAll<HTMLMetaElement>(
         'meta[name="theme-color"]',
     );

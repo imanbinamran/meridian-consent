@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Menu } from 'lucide-react';
+import { LogIn, Menu } from 'lucide-react';
 import { useState } from 'react';
 import {
     Sheet,
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn } from '@/lib/utils';
+import { login } from '@/routes';
 import { siteNav } from './site-nav';
 import { SiteLogo } from './site-logo';
 import { ThemeToggle } from './theme-toggle';
@@ -87,6 +88,17 @@ export function SiteHeader() {
                 </nav>
 
                 <div className="flex items-center gap-1">
+                    <Link
+                        href={login()}
+                        aria-label="Staff sign-in"
+                        title="Staff sign-in"
+                        className="hidden size-10 items-center justify-center rounded-full text-foreground transition-[background-color,transform] duration-150 ease-out-strong hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.97] md:inline-flex"
+                    >
+                        <LogIn
+                            className="size-5 rtl:-scale-x-100"
+                            aria-hidden="true"
+                        />
+                    </Link>
                     <ThemeToggle />
 
                     <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -145,6 +157,19 @@ export function SiteHeader() {
                                         );
                                     })}
                                 </ul>
+                                <div className="mt-3 border-t border-foreground/10 pt-3">
+                                    <Link
+                                        href={login()}
+                                        onClick={() => setMenuOpen(false)}
+                                        className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-base font-medium text-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    >
+                                        <LogIn
+                                            className="size-5 rtl:-scale-x-100"
+                                            aria-hidden="true"
+                                        />
+                                        Staff sign-in
+                                    </Link>
+                                </div>
                             </nav>
                         </SheetContent>
                     </Sheet>
