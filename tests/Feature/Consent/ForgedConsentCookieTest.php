@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Consent;
+use App\Models\ConsentEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -10,6 +11,7 @@ use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 use function Tests\Feature\Consent\acceptedCookieValue;
+use function Tests\Feature\Consent\breakConsentQueries;
 use function Tests\Feature\Consent\consentCookie;
 use function Tests\Feature\Consent\recordedCookieValue;
 
@@ -118,13 +120,36 @@ it('still asks about a malformed cookie when the lookup would fail', function ()
 // CON-077
 it('writes nothing from the cookie when Accept arrives during a failed lookup', function () {
     Log::spy();
-    Schema::drop('consents');
+    $restore = breakConsentQueries();
 
-    $value = acceptedCookieValue();
+    $response = $this->withUnencryptedCookie('consent', acceptedCookieValue())->post(route('consent.accept'));
 
-    $response = $this->withUnencryptedCookie('consent', $value)->post(route('consent.accept'));
+    $restore();
 
-    expect(consentCookie($response)->getValue())->toBe($value);
+    $response->assertRedirect()->assertInertiaFlash('toast.type', 'error');
+
+    expect($response->getCookie('consent', decrypt: false))->toBeNull()
+        ->and($response->getCookie('consent_declined', decrypt: false))->toBeNull()
+        ->and(Consent::count())->toBe(0)
+        ->and(ConsentEvent::count())->toBe(0);
+
+    Log::shouldHaveReceived('warning')->once();
+});
+
+// CON-077
+it('says nothing was saved when Accept cannot write during an outage', function () {
+    $restore = breakConsentQueries();
+
+    $response = $this->post(route('consent.accept'));
+
+    $restore();
+
+    $response->assertRedirect()
+        ->assertInertiaFlash('toast.type', 'error')
+        ->assertInertiaFlash('toast.message', 'We could not save your cookie choice. Please try again.');
+
+    expect($response->getCookie('consent', decrypt: false))->toBeNull()
+        ->and(Consent::count())->toBe(0);
 });
 
 // CON-078

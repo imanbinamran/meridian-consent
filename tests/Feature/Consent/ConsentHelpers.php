@@ -3,7 +3,10 @@
 namespace Tests\Feature\Consent;
 
 use App\Models\Consent;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use PDOException;
 use Symfony\Component\HttpFoundation\Cookie;
 
 /**
@@ -51,4 +54,23 @@ function recordedCookieValue(array $overrides = []): string
     ]);
 
     return $value;
+}
+
+/**
+ * Make every query on the consents table fail, as if the database were down,
+ * without changing the schema. Call the returned closure to bring it back.
+ */
+function breakConsentQueries(): \Closure
+{
+    $broken = true;
+
+    DB::connection()->beforeExecuting(function (string $query) use (&$broken): void {
+        if ($broken && preg_match('/["`]consents["`]/', $query) === 1) {
+            throw new QueryException('testing', $query, [], new PDOException('The database is down.'));
+        }
+    });
+
+    return function () use (&$broken): void {
+        $broken = false;
+    };
 }

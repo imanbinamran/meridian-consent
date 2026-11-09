@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Support\Consent\ConsentManager;
+use Illuminate\Database\LostConnectionException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use PDOException;
 
 class ConsentController extends Controller
 {
@@ -14,7 +18,16 @@ class ConsentController extends Controller
 
     public function accept(Request $request): RedirectResponse
     {
-        $consent = $this->consent->accept($request);
+        try {
+            $consent = $this->consent->accept($request);
+        } catch (QueryException|PDOException|LostConnectionException $exception) {
+            // The exception message holds the SQL and its bindings, so it stays out of the log.
+            Log::warning('A consent choice could not be saved.', ['exception' => $exception::class]);
+
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('We could not save your cookie choice. Please try again.')]);
+
+            return redirect()->to($this->previousUrl());
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Thanks. Your cookie choice is saved.')]);
 

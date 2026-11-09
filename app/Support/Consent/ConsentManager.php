@@ -59,13 +59,18 @@ final class ConsentManager
      * keeps its GUID and time, so a double click or a retry never adds a row.
      * Everything stored here is made by the server, never read from a cookie.
      * The row and its accepted event are written together or not at all.
+     *
+     * Unlike a page view, this never falls back to believing the cookie: if
+     * the database cannot answer, the failure reaches the caller and nothing
+     * is treated as saved.
      */
     public function accept(Request $request): AcceptedConsent
     {
-        $existing = $this->state($request)->accepted;
+        $cookie = $this->acceptedFromCookie($request, $this->now(), $this->version());
+        $record = $cookie === null ? null : $this->matchingRecord($cookie);
 
-        if ($existing !== null) {
-            return $existing;
+        if ($record !== null) {
+            return AcceptedConsent::fromRecord($record);
         }
 
         $consent = AcceptedConsent::issue($this->now(), $this->version());
@@ -154,7 +159,7 @@ final class ConsentManager
      * row agrees. The database is only read once the format checks pass.
      *
      * If the database cannot answer, a well-formed cookie is believed for
-     * this request so an outage does not lock readers behind the box.
+     * this page view so an outage does not lock readers behind the box.
      */
     private function verifiedAccepted(Request $request, CarbonImmutable $now): ?AcceptedConsent
     {
