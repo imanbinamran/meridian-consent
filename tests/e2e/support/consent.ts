@@ -74,6 +74,16 @@ export async function expectNoConsentBox(page: Page): Promise<void> {
     await expect(consentDialog(page)).toBeHidden();
 }
 
+/**
+ * The box after a link inside it was followed. Waits for the blocking box to
+ * finish its exit animation, so only the docked one is left to find.
+ */
+export async function expectDockedConsentBox(page: Page): Promise<Locator> {
+    await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
+
+    return expectConsentBox(page);
+}
+
 /** Wait for running CSS animations (dialog fade/slide) to finish. */
 export async function settleAnimations(page: Page): Promise<void> {
     await page.evaluate(() =>

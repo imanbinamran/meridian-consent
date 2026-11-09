@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { setReadingStorageAllowed } from '@/components/site/story/reading-store';
+import { privacy, terms } from '@/routes';
 import { accept, decline } from '@/routes/consent';
 
 export type ConsentChoice = 'accepted' | 'declined';
@@ -24,13 +25,18 @@ export type ConsentProps = {
 
 type ConsentContextValue = {
     consent: ConsentProps;
+    /** The blocking box: the page behind it is locked and inert. */
     open: boolean;
+    /** The visitor is reading Terms or Privacy, with the choice still owed. */
+    docked: boolean;
     /** True when the visitor reopened the box and may close it again. */
     dismissible: boolean;
     pending: ConsentChoice | null;
     choose: (choice: ConsentChoice) => void;
     reopen: () => void;
     close: () => void;
+    /** Call once a link inside the box has landed on its page. */
+    followedLegalLink: () => void;
 };
 
 const ConsentContext = createContext<ConsentContextValue | null>(null);
@@ -38,14 +44,32 @@ const ConsentContext = createContext<ConsentContextValue | null>(null);
 /** Matches the class app.blade.php sets before React loads. */
 const LOCK_CLASS = 'consent-locked';
 
+function isLegalPage(url: string): boolean {
+    const path = url.split(/[?#]/)[0];
+
+    return path === terms.url() || path === privacy.url();
+}
+
 export function ConsentProvider({ children }: { children: ReactNode }) {
-    const consent = usePage().props.consent as ConsentProps;
+    const page = usePage();
+    const consent = page.props.consent as ConsentProps;
+    const onLegalPage = isLegalPage(page.url);
     const [reopened, setReopened] = useState(false);
+    const [reading, setReading] = useState(false);
     const [pending, setPending] = useState<ConsentChoice | null>(null);
     // Guards against a double click landing before React re-renders.
     const inFlight = useRef(false);
 
-    const open = consent.enabled && (consent.required || reopened);
+    // Leaving the legal pages ends reading mode, so the full box comes back.
+    if (reading && !onLegalPage) {
+        setReading(false);
+    }
+
+    // Only a click on a link in the box docks it. Opening /terms directly, or
+    // refreshing it, still shows the full box with the page locked.
+    const docked =
+        consent.enabled && consent.required && reading && onLegalPage;
+    const open = consent.enabled && (consent.required || reopened) && !docked;
 
     useEffect(() => {
         document.documentElement.classList.toggle(LOCK_CLASS, open);
@@ -74,7 +98,10 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setPending(choice),
-                onSuccess: () => setReopened(false),
+                onSuccess: () => {
+                    setReopened(false);
+                    setReading(false);
+                },
                 onFinish: () => {
                     inFlight.current = false;
                     setPending(null);
@@ -86,14 +113,22 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     const value: ConsentContextValue = {
         consent,
         open,
+        docked,
         dismissible: !consent.required,
         pending,
         choose,
-        reopen: () => setReopened(true),
+        reopen: () => {
+            setReading(false);
+            setReopened(true);
+        },
         close: () => {
             if (!consent.required) {
                 setReopened(false);
             }
+        },
+        followedLegalLink: () => {
+            setReopened(false);
+            setReading(consent.required);
         },
     };
 
