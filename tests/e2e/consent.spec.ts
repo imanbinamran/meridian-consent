@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { ADMIN_STORAGE_STATE } from './support/admin';
 import {
     ACCEPTED_COOKIE,
     COPY,
     DAY_SECONDS,
     DECLINED_COOKIE,
+    EXPIRED_CONSENT,
     ISO_UTC,
     PUBLIC_PAGES,
     UUID_V4,
@@ -249,20 +251,29 @@ test.describe('accept cookie missing, expired or invalid', () => {
         await expectConsentBox(page);
     });
 
-    test('CON-041 a cookie still in the browser but accepted over a year ago brings the box back', async ({
+    test('CON-041 a cookie matching a real row accepted over a year ago brings the box back', async ({
         page,
         context,
+        browser,
         baseURL,
     }) => {
-        const value = JSON.stringify({
-            guid: crypto.randomUUID(),
-            accepted_at: '2025-01-01T00:00:00Z',
-            version: 1,
+        // The row is really there and everything but its age matches the
+        // cookie, so the one-year rule is what brings the box back.
+        const admin = await browser.newContext({
+            baseURL,
+            storageState: ADMIN_STORAGE_STATE,
         });
+        const adminPage = await admin.newPage();
+        await adminPage.goto(`/admin/consents/${EXPIRED_CONSENT.guid}`);
+        await expect(
+            adminPage.locator('dt', { hasText: /^Status$/ }).locator('+ dd'),
+        ).toHaveText('Expired');
+        await admin.close();
+
         await addAcceptedCookie(
             context,
             baseURL as string,
-            value,
+            JSON.stringify(EXPIRED_CONSENT),
             30 * DAY_SECONDS,
         );
 
