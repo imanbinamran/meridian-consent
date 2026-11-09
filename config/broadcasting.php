@@ -50,9 +50,14 @@ return [
 
         'pusher' => [
             'driver' => 'pusher',
-            'key' => env('PUSHER_APP_KEY'),
-            'secret' => env('PUSHER_APP_SECRET'),
-            'app_id' => env('PUSHER_APP_ID'),
+            // Cast, because the client refuses null and the channel routes build
+            // it on every boot. A missing value must leave live updates off, not
+            // take the whole site down.
+            'key' => (string) env('PUSHER_APP_KEY'),
+            'secret' => (string) env('PUSHER_APP_SECRET'),
+            'app_id' => (string) env('PUSHER_APP_ID'),
+            // Set only when this connection points at a server of your own.
+            'custom_host' => env('PUSHER_HOST'),
             'options' => [
                 'cluster' => env('PUSHER_APP_CLUSTER'),
                 'host' => env('PUSHER_HOST') ?: 'api-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com',
@@ -60,9 +65,14 @@ return [
                 'scheme' => env('PUSHER_SCHEME', 'https'),
                 'encrypted' => true,
                 'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+                // Seconds. The Pusher client sends this with every request, so
+                // it beats the timeout in client_options below.
+                'timeout' => 2,
             ],
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Seconds. An unreachable socket server must fail fast, not tie up a worker.
+                'connect_timeout' => 1,
+                'timeout' => 2,
             ],
         ],
 
