@@ -12,7 +12,10 @@ namespace App\Support\Consent;
  */
 final readonly class DeviceProfile
 {
-    public const DEVICE_TYPES = ['Desktop', 'Mobile', 'Tablet', 'Unknown'];
+    /** How the admin portal names a detail that was never recorded. */
+    public const UNKNOWN = 'Unknown';
+
+    public const DEVICE_TYPES = ['Desktop', 'Mobile', 'Tablet', self::UNKNOWN];
 
     public const BROWSER_FAMILIES = ['Chrome', 'Safari', 'Firefox', 'Edge', 'Other'];
 

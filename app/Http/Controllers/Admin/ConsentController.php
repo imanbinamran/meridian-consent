@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ConsentIndexRequest;
 use App\Models\Consent;
+use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,6 +18,9 @@ class ConsentController extends Controller
 
     private const EXPORT_CHUNK = 1000;
 
+    /** What the table and the export read, so neither loads more than it shows. */
+    private const LIST_COLUMNS = ['id', 'guid', 'version', 'accepted_at', 'withdrawn_at', 'device_type', 'browser_family', 'os_family'];
+
     public function index(ConsentIndexRequest $request): Response
     {
         $currentVersion = (int) config('consent.version');
@@ -25,13 +29,15 @@ class ConsentController extends Controller
             'timezone' => config('admin.timezone'),
             'filters' => $request->filters(),
             'consents' => $request->consentQuery()
-                ->paginate(self::PER_PAGE, ['id', 'guid', 'version', 'accepted_at', 'created_at'])
+                ->paginate(self::PER_PAGE, [...self::LIST_COLUMNS, 'created_at'])
                 ->withQueryString()
                 ->through(fn (Consent $consent) => [
                     'id' => $consent->id,
                     'guid' => $consent->guid,
                     'version' => $consent->version,
                     'isCurrent' => $consent->version === $currentVersion,
+                    'status' => $this->status($consent),
+                    ...$this->device($consent),
                     'acceptedAt' => $consent->accepted_at->toIso8601ZuluString(),
                     'recordedAt' => $consent->created_at?->toIso8601ZuluString(),
                 ]),
@@ -77,5 +83,24 @@ class ConsentController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Cache-Control' => 'no-store',
         ]);
+    }
+
+    private function status(Consent $consent): string
+    {
+        return $consent->isWithdrawn() ? ConsentIndexRequest::STATUS_WITHDRAWN : ConsentIndexRequest::STATUS_ACTIVE;
+    }
+
+    /**
+     * Rows from before device details were kept have nulls here.
+     *
+     * @return array{deviceType: string, browserFamily: string, osFamily: string}
+     */
+    private function device(Consent $consent): array
+    {
+        return [
+            'deviceType' => $consent->device_type ?? DeviceProfile::UNKNOWN,
+            'browserFamily' => $consent->browser_family ?? DeviceProfile::UNKNOWN,
+            'osFamily' => $consent->os_family ?? DeviceProfile::UNKNOWN,
+        ];
     }
 }

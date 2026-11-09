@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { CopyButton } from './copy-button';
-import { formatRecent, formatUtc } from './format';
+import { formatDevice, formatRecent, formatUtc } from './format';
 import { LocalTime } from './local-time';
 import { PRESSABLE } from './motion';
+import { StatusBadge } from './status-badge';
 import type { ConsentRow, SortDirection } from './types';
 
 type Props = {
@@ -34,11 +35,13 @@ export function ConsentsTable({
     const SortIcon = direction === 'desc' ? ArrowDown : ArrowUp;
 
     return (
-        <Table className="min-w-[42rem]" aria-busy={busy}>
+        <Table className="min-w-[56rem]" aria-busy={busy}>
             <TableHeader>
                 <TableRow className="hover:bg-transparent">
                     <TableHead className="ps-4">GUID</TableHead>
                     <TableHead>Version</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Device</TableHead>
                     <TableHead
                         aria-sort={
                             direction === 'desc' ? 'descending' : 'ascending'
@@ -104,6 +107,12 @@ export function ConsentsTable({
                             >
                                 v{row.version}
                             </Badge>
+                        </TableCell>
+                        <TableCell>
+                            <StatusBadge status={row.status} />
+                        </TableCell>
+                        <TableCell className="min-w-40 whitespace-normal">
+                            {formatDevice(row)}
                         </TableCell>
                         <TableCell>
                             <LocalTime

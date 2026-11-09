@@ -1,8 +1,18 @@
-export type ConsentRow = {
+export type ConsentStatus = 'active' | 'withdrawn';
+
+/** Coarse device details. Never null: a missing value arrives as "Unknown". */
+export type ConsentDevice = {
+    deviceType: string;
+    browserFamily: string;
+    osFamily: string;
+};
+
+export type ConsentRow = ConsentDevice & {
     id: number;
     guid: string;
     version: number;
     isCurrent: boolean;
+    status: ConsentStatus;
     acceptedAt: string;
     recordedAt: string | null;
 };

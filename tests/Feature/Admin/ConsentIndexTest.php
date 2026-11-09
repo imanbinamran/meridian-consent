@@ -2,6 +2,7 @@
 
 use App\Models\Consent;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -22,7 +23,7 @@ test('it lists consents 25 to a page, newest first', function () {
             ->where('consents.last_page', 2)
             ->where('filters', ['direction' => 'desc'])
             ->has('consents.data.0', fn (Assert $row) => $row
-                ->hasAll(['id', 'guid', 'version', 'isCurrent', 'acceptedAt', 'recordedAt'])),
+                ->hasAll(['id', 'guid', 'version', 'isCurrent', 'status', 'deviceType', 'browserFamily', 'osFamily', 'acceptedAt', 'recordedAt'])),
         );
 
     $this->get(route('admin.consents.index', ['page' => 2]))
@@ -126,4 +127,54 @@ test('the empty table still renders', function () {
             ->has('consents.data', 0)
             ->where('consents.total', 0)
             ->where('versions', [1]));
+});
+
+test('ADM-041 each row says whether it is active or withdrawn and what device it came from', function () {
+    $active = Consent::factory()->create([
+        'accepted_at' => '2026-11-02 00:00:00',
+        'device_type' => 'Desktop',
+        'browser_family' => 'Chrome',
+        'os_family' => 'macOS',
+    ]);
+    $withdrawn = Consent::factory()->withdrawn()->create(['accepted_at' => '2026-11-01 00:00:00']);
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.data.0.id', $active->id)
+            ->where('consents.data.0.status', 'active')
+            ->where('consents.data.0.deviceType', 'Desktop')
+            ->where('consents.data.0.browserFamily', 'Chrome')
+            ->where('consents.data.0.osFamily', 'macOS')
+            ->where('consents.data.1.id', $withdrawn->id)
+            ->where('consents.data.1.status', 'withdrawn'));
+});
+
+test('ADM-042 rows from before device details were kept read Unknown', function () {
+    Consent::factory()->create(['device_type' => null, 'browser_family' => null, 'os_family' => null]);
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.data.0.deviceType', 'Unknown')
+            ->where('consents.data.0.browserFamily', 'Unknown')
+            ->where('consents.data.0.osFamily', 'Unknown'));
+});
+
+test('ADM-047 the table never reads events and its queries do not grow with the rows', function () {
+    $queriesFor = function (): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get(route('admin.consents.index'))->assertOk();
+        DB::disableQueryLog();
+
+        return array_column(DB::getQueryLog(), 'query');
+    };
+
+    Consent::factory()->withdrawn()->create();
+    $one = $queriesFor();
+
+    Consent::factory()->count(20)->withdrawn()->create();
+    $many = $queriesFor();
+
+    expect(count($many))->toBe(count($one))
+        ->and(implode(' ', $many))->not->toContain('consent_events');
 });

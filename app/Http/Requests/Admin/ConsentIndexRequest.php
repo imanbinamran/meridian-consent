@@ -16,6 +16,10 @@ class ConsentIndexRequest extends FormRequest
 {
     public const DIRECTIONS = ['desc', 'asc'];
 
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_WITHDRAWN = 'withdrawn';
+
     public function authorize(): bool
     {
         return true;
