@@ -300,6 +300,69 @@ test.describe('accept cookie missing, expired or invalid', () => {
         });
     }
 
+    test('CON-072 a well-formed cookie with no database row brings the box back', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        const value = JSON.stringify({
+            guid: crypto.randomUUID(),
+            accepted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+            version: 1,
+        });
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            value,
+            30 * DAY_SECONDS,
+        );
+
+        await page.goto('/');
+        await expectConsentBox(page);
+    });
+
+    test('CON-073 Accept with a forged cookie replaces its GUID', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        const forgedGuid = crypto.randomUUID();
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            JSON.stringify({
+                guid: forgedGuid,
+                accepted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+                version: 99,
+            }),
+            30 * DAY_SECONDS,
+        );
+
+        await page.goto('/');
+        const dialog = await expectConsentBox(page);
+        await dialog
+            .getByRole('button', { name: 'Accept', exact: true })
+            .click();
+        await expect(dialog).toBeHidden();
+
+        await expect
+            .poll(
+                async () =>
+                    parseAcceptedCookie(
+                        await waitForCookie(context, ACCEPTED_COOKIE),
+                    ).guid,
+            )
+            .not.toBe(forgedGuid);
+        const accepted = parseAcceptedCookie(
+            await waitForCookie(context, ACCEPTED_COOKIE),
+        );
+        expect(accepted.guid).toMatch(UUID_V4);
+        expect(accepted.version).toBe(1);
+
+        await page.reload();
+        await expectNoConsentBox(page);
+    });
+
     test('CON-043 (browser half) a cookie from an older version brings the box back', async ({
         page,
         context,

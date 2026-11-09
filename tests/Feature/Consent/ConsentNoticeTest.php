@@ -2,11 +2,13 @@
 
 use Carbon\CarbonImmutable;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 use function Tests\Feature\Consent\acceptedCookieValue;
 use function Tests\Feature\Consent\consentCookie;
+use function Tests\Feature\Consent\recordedCookieValue;
 
 require_once __DIR__.'/ConsentHelpers.php';
 
@@ -36,12 +38,12 @@ it('locks scrolling from the first paint while a choice is required', function (
 
     expect($this->get(route('home'))->getContent())->toMatch($lockedHtmlTag);
 
-    expect($this->withUnencryptedCookie('consent', acceptedCookieValue())->get(route('home'))->getContent())
+    expect($this->withUnencryptedCookie('consent', recordedCookieValue())->get(route('home'))->getContent())
         ->not->toMatch($lockedHtmlTag);
 });
 
 it('does not ask again while the consent cookie is valid', function () {
-    $response = $this->withUnencryptedCookie('consent', acceptedCookieValue())->get(route('about'));
+    $response = $this->withUnencryptedCookie('consent', recordedCookieValue())->get(route('about'));
 
     assertConsentRequired($response, false);
     $response->assertInertia(fn (Assert $page) => $page
@@ -86,15 +88,18 @@ it('asks again a day after declining', function () {
 it('asks everyone again when the notice version is raised', function () {
     config(['consent.version' => 2]);
 
-    $response = $this->withUnencryptedCookie('consent', acceptedCookieValue(['version' => 1]))->get(route('home'));
+    $response = $this->withUnencryptedCookie('consent', recordedCookieValue(['version' => 1]))->get(route('home'));
     assertConsentRequired($response, true);
 
-    $current = $this->withUnencryptedCookie('consent', acceptedCookieValue(['version' => 2]))->get(route('home'));
+    $current = $this->withUnencryptedCookie('consent', recordedCookieValue([
+        'guid' => '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+        'version' => 2,
+    ]))->get(route('home'));
     assertConsentRequired($current, false);
 });
 
 it('issues a new guid when accepting a newer notice version', function () {
-    $old = acceptedCookieValue(['version' => 1]);
+    $old = recordedCookieValue(['version' => 1]);
     config(['consent.version' => 2]);
 
     $data = json_decode(
@@ -107,7 +112,12 @@ it('issues a new guid when accepting a newer notice version', function () {
 });
 
 it('treats a tampered or invalid consent cookie as absent', function (string $value) {
+    DB::enableQueryLog();
+
     assertConsentRequired($this->withUnencryptedCookie('consent', $value)->get(route('home')), true);
+
+    // Rejected by the format checks alone, not because no row was found.
+    expect(array_filter(DB::getQueryLog(), fn (array $entry): bool => str_contains($entry['query'], 'consents')))->toBeEmpty();
 })->with([
     'not JSON' => 'yes',
     'empty object' => '{}',

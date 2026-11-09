@@ -4,8 +4,8 @@ use App\Models\Consent;
 use App\Models\ConsentDecline;
 use Carbon\CarbonImmutable;
 
-use function Tests\Feature\Consent\acceptedCookieValue;
 use function Tests\Feature\Consent\consentCookie;
+use function Tests\Feature\Consent\recordedCookieValue;
 
 require_once __DIR__.'/ConsentHelpers.php';
 
@@ -47,7 +47,7 @@ it('does not count the same decline twice', function () {
 
 it('clears an earlier consent cookie', function () {
     $response = $this
-        ->withUnencryptedCookie('consent', acceptedCookieValue())
+        ->withUnencryptedCookie('consent', recordedCookieValue())
         ->post(route('consent.decline'));
 
     $cleared = consentCookie($response, 'consent');

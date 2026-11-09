@@ -143,7 +143,11 @@ export async function declineConsent(page: Page): Promise<Cookie> {
     return waitForCookie(page.context(), DECLINED_COOKIE);
 }
 
-/** Put a consent cookie straight into the browser, URL-encoded like PHP sends it. */
+/**
+ * Put a consent cookie straight into the browser, URL-encoded like PHP sends it.
+ * No database row is created, so the server treats it as forged: use it only
+ * where the box is expected to come back. To get a real cookie, click Accept.
+ */
 export async function addAcceptedCookie(
     context: BrowserContext,
     baseURL: string,

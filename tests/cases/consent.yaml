@@ -116,6 +116,14 @@ requirements:
       text: The public pages and the consent box have no serious or critical accessibility violations
       anchor: 'S2 a11y scan (WCAG 2.2 AA)'
       risk: { impact: 2, likelihood: 2 }
+    - id: REQ-23
+      text: 'An accept cookie counts only if a consents row exists with its GUID and the same accepted_at (to the second) and version; the row is read only after the format checks pass'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php, forged cookie fix'
+      risk: { impact: 3, likelihood: 3 }
+    - id: REQ-24
+      text: 'If the consents lookup throws a database error, a format-valid cookie counts as valid for that request and a warning is logged'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php, outage handling'
+      risk: { impact: 2, likelihood: 1 }
 
 scope:
     in:
@@ -1105,3 +1113,205 @@ cases:
       cleanup: 'Clear site cookies'
       tags: [manual]
       notes: 'Manual walkthrough for the hand-in video; CON-030 proves the same value automatically.'
+
+    - id: CON-072
+      title: A valid-format cookie with no database row shows the box
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'No consents row for the cookie GUID']
+      steps:
+          - Send a request to a public page with a well-formed consent cookie and a v4 GUID that has no row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true and consent.choice is null',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest, e2e]
+
+    - id: CON-073
+      title: Accept with a forged cookie issues a new GUID and stores nothing from it
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'Time frozen at 2026-11-08 09:30:15 UTC']
+      steps:
+          - POST the accept endpoint with a well-formed consent cookie (no row, accepted_at 2026-11-01, version 99)
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: New GUID,
+                expected: 'The new cookie and the one stored row carry a server-made v4 GUID, not the forged one',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Server time and version,
+                expected: 'Stored accepted_at = 2026-11-08 09:30:15 UTC and version = 1',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest, e2e]
+
+    - id: CON-074
+      title: A real GUID with an altered time or version shows the box
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'One consents row for the cookie GUID']
+      steps:
+          - Send a request with the real GUID and accepted_at moved by one second, or moved by a day, or a different version
+          - POST the accept endpoint with the altered cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true for each altered value',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Real row untouched,
+                expected: 'The original row keeps its time and version, and Accept adds a separate row with a new GUID',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-075
+      title: A forged version 99 cookie shows the box
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - Send a request with a well-formed consent cookie, version 99 and no row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Box shown,
+                expected: 'consent.required is true',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-076
+      title: A database error during the lookup does not bring the box back
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-24]
+      role: visitor
+      preconditions:
+          [Fixture F2, 'The consents table is dropped so the lookup throws']
+      steps:
+          - Send a request with a well-formed consent cookie
+          - Send a request with a malformed consent cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Well-formed believed,
+                expected: 'consent.required is false, consent.choice is accepted and one warning is logged',
+                provenance: REQ-24,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Malformed still rejected,
+                expected: 'consent.required is true and no warning is logged',
+                provenance: REQ-24,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+      notes: 'Only reachable when sessions are not stored in the same database: with SESSION_DRIVER=database the session read fails first and the request is a 500.'
+
+    - id: CON-077
+      title: Accept during a failed lookup writes nothing from the cookie
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-24]
+      role: visitor
+      preconditions:
+          [Fixture F2, 'The consents table is dropped so the lookup throws']
+      steps:
+          - POST the accept endpoint with a well-formed consent cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Cookie returned as is,
+                expected: 'The response sets the same cookie value and no write is attempted',
+                provenance: REQ-24,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-078
+      title: The database is read only after the format checks pass
+      type: api
+      scenario_class: render
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-23]
+      role: visitor
+      preconditions: [Fixture F2, 'Query log on']
+      steps:
+          - Send a request with a cookie that fails the format checks
+          - Send a request with the cookie of a real row
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: No read for a bad cookie,
+                expected: 'No query touches the consents table',
+                provenance: REQ-23,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: One read for a good cookie,
+                expected: 'Exactly one query touches the consents table',
+                provenance: REQ-23,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
