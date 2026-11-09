@@ -131,7 +131,9 @@ test.describe('as the admin', () => {
         const csv = await readFile(await download.path(), 'utf8');
         const lines = csv.replace(/^﻿/, '').trim().split(/\r?\n/);
 
-        expect(lines[0]).toBe('guid,version,accepted_at_utc');
+        expect(lines[0]).toBe(
+            'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family',
+        );
         expect(lines).toHaveLength(2);
         expect(lines[1].startsWith(`${guid},`)).toBe(true);
     });

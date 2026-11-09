@@ -85,7 +85,7 @@ class ConsentController extends Controller
      */
     public function export(ConsentIndexRequest $request): StreamedResponse
     {
-        $query = $request->consentQuery()->select(['id', 'guid', 'version', 'accepted_at']);
+        $query = $request->consentQuery()->select(self::LIST_COLUMNS);
         $filename = 'consents-'.CarbonImmutable::now(config('admin.timezone'))->toDateString().'.csv';
 
         return response()->streamDownload(function () use ($query) {
@@ -95,13 +95,16 @@ class ConsentController extends Controller
                 throw new RuntimeException('Could not open the output stream for the CSV export.');
             }
 
-            fputcsv($out, ['guid', 'version', 'accepted_at_utc'], escape: '');
+            fputcsv($out, ['guid', 'version', 'accepted_at_utc', 'status', 'withdrawn_at', 'device_type', 'browser_family', 'os_family'], escape: '');
 
             foreach ($query->lazy(self::EXPORT_CHUNK) as $consent) {
                 fputcsv($out, [
                     $consent->guid,
                     $consent->version,
                     $consent->accepted_at->toIso8601ZuluString(),
+                    $this->status($consent),
+                    $consent->withdrawn_at?->toIso8601ZuluString(),
+                    ...array_values($this->device($consent)),
                 ], escape: '');
             }
 
