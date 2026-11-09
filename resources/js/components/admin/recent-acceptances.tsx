@@ -23,7 +23,7 @@ type Props = {
 
 export function RecentAcceptances({ items, timeZone }: Props) {
     return (
-        <Card className="gap-4">
+        <Card className="h-full gap-4">
             <CardHeader>
                 <CardTitle>Recent acceptances</CardTitle>
                 <CardDescription>
