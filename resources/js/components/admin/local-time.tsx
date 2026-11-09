@@ -12,10 +12,38 @@ type Props = {
     className?: string;
     /** Visible text; defaults to the full local date and time. */
     children?: React.ReactNode;
+    /** Print the UTC value under the time instead of in a tooltip. */
+    showUtc?: boolean;
 };
 
 /** A timestamp shown in local time, with the exact UTC value on hover or focus. */
-export function LocalTime({ iso, timeZone, className, children }: Props) {
+export function LocalTime({
+    iso,
+    timeZone,
+    className,
+    children,
+    showUtc = false,
+}: Props) {
+    if (showUtc) {
+        return (
+            <span className="grid gap-0.5">
+                <time
+                    dateTime={iso}
+                    dir="ltr"
+                    className={cn('whitespace-nowrap tabular-nums', className)}
+                >
+                    {children ?? formatDateTime(iso, timeZone)}
+                </time>
+                <span
+                    dir="ltr"
+                    className="font-mono text-xs whitespace-nowrap tabular-nums"
+                >
+                    {formatUtc(iso)}
+                </span>
+            </span>
+        );
+    }
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>

@@ -1,0 +1,124 @@
+import { Link } from '@inertiajs/react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { home } from '@/routes';
+import { Headline } from './headline';
+import { markFinished } from './reading-store';
+import { StoryLink } from './story-link';
+import type { Story } from './types';
+
+const QUICK_SHARE = 0.4;
+
+function duration(milliseconds: number): string {
+    const seconds = Math.max(1, Math.round(milliseconds / 1000));
+
+    return seconds < 60
+        ? `${seconds} sec`
+        : `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
+}
+
+/**
+ * The end of a story: a mark on the last line, the time it took, and the next
+ * story. The time stays on this page. It is never stored or sent anywhere.
+ */
+export function StoryFinish({ story }: { story: Story }) {
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [line, setLine] = useState('You’ve reached the end.');
+
+    useLayoutEffect(() => {
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const parts = rootRef.current?.querySelectorAll('.story-finish-part');
+        const end = document.getElementById('story-end');
+
+        if (!end || !parts) {
+            return;
+        }
+
+        if (!reduced) {
+            end.classList.add('pending');
+            parts.forEach((part) => part.classList.add('pending'));
+        }
+
+        let readMs = 0;
+        let since = document.hidden ? 0 : performance.now();
+
+        const pause = () => {
+            if (since) {
+                readMs += performance.now() - since;
+                since = 0;
+            }
+        };
+        const onVisibility = () => {
+            if (document.hidden) {
+                pause();
+            } else {
+                since = performance.now();
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibility);
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+
+                observer.disconnect();
+                pause();
+                markFinished(story.slug);
+                end.classList.remove('pending');
+                end.classList.add('stamped');
+                parts.forEach((part) => part.classList.remove('pending'));
+
+                const promised = story.minutes * 60_000;
+
+                setLine(
+                    readMs < promised * QUICK_SHARE
+                        ? `That was quick. ${duration(readMs)} on this story.`
+                        : `Finished. ${duration(readMs)} on this story, about what we promised.`,
+                );
+            },
+            { rootMargin: '0px 0px -8% 0px' },
+        );
+
+        observer.observe(end);
+
+        return () => {
+            observer.disconnect();
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [story.slug, story.minutes]);
+
+    return (
+        <div ref={rootRef} className="story-finish">
+            <p
+                className="story-finish-part font-display text-xl text-muted-foreground italic"
+                aria-live="polite"
+            >
+                {line}
+            </p>
+            <div className="story-finish-part border-t-2 border-foreground pt-3.5">
+                <p className="text-xs font-semibold tracking-[0.12em] text-brand uppercase">
+                    Next in this week&rsquo;s edition
+                </p>
+                <StoryLink
+                    slug={story.next.slug}
+                    className="group mt-3 block rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background focus-visible:outline-none"
+                >
+                    <span className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                        {story.next.desk} · {story.next.minutes} min read
+                    </span>
+                    <span className="mt-1.5 block font-display text-3xl leading-[1.12] font-medium tracking-tight text-balance decoration-brand decoration-1 underline-offset-[5px] group-hover:underline sm:text-4xl">
+                        <Headline text={story.next.title} />
+                    </span>
+                </StoryLink>
+            </div>
+            <Link
+                href={`${home.url()}#edition`}
+                className="story-finish-part justify-self-start text-sm underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
+            >
+                Back to this week&rsquo;s edition
+            </Link>
+        </div>
+    );
+}

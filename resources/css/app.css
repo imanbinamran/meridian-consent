@@ -9,6 +9,7 @@
 @import '@fontsource/newsreader/600.css';
 @import '@fontsource/newsreader/400-italic.css';
 @import '@fontsource/newsreader/500-italic.css';
+@import './story.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
