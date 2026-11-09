@@ -1,0 +1,157 @@
+name: BrowserStack
+
+# Runs after a merge to main, or by hand from the Actions tab. It also runs on
+# a pull request that changes this setup, so the setup can be tested first.
+# It is not a required check, so a bad run cannot block a merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/browserstack.yml
+      - browserstack.yml
+      - playwright.browserstack.config.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.4'
+  NODE_VERSION: '24'
+  PNPM_VERSION: '11'
+  PHP_EXTENSIONS: mbstring, intl, bcmath, pdo_sqlite, pdo_mysql
+
+jobs:
+  # Secrets cannot be read in a job-level `if`, and forks do not get them.
+  # Skip cleanly when they are missing instead of failing main.
+  check:
+    name: Check credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      configured: ${{ steps.credentials.outputs.configured }}
+    steps:
+      - name: Look for BrowserStack secrets
+        id: credentials
+        env:
+          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+        run: |
+          if [ -n "$BROWSERSTACK_USERNAME" ] && [ -n "$BROWSERSTACK_ACCESS_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::BrowserStack secrets are not set, so the run was skipped."
+          fi
+
+  browserstack:
+    name: Playwright on BrowserStack
+    needs: check
+    if: needs.check.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: meridian
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      # BrowserStack's tunnel maps bs-local.com to the runner. iPhones cannot
+      # use 127.0.0.1 through it.
+      E2E_BASE_URL: http://bs-local.com:8000
+      PHP_CLI_SERVER_WORKERS: '4'
+      CONSENT_THROTTLE: '1000'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Point bs-local.com at the runner
+        run: echo '127.0.0.1 bs-local.com' | sudo tee -a /etc/hosts
+
+      - name: Prepare the environment file
+        run: |
+          cp .env.example .env
+          sed -i \
+            -e "s|^APP_URL=.*|APP_URL=$E2E_BASE_URL|" \
+            -e 's|^DB_CONNECTION=.*|DB_CONNECTION=mysql|' \
+            -e 's|^DB_HOST=.*|DB_HOST=127.0.0.1|' \
+            -e 's|^DB_PORT=.*|DB_PORT=3306|' \
+            -e 's|^DB_DATABASE=.*|DB_DATABASE=meridian|' \
+            -e 's|^DB_USERNAME=.*|DB_USERNAME=root|' \
+            -e 's|^DB_PASSWORD=.*|DB_PASSWORD=password|' \
+            .env
+          php artisan key:generate --no-interaction
+
+      - name: Migrate and seed
+        run: php artisan migrate --seed --force --no-interaction
+
+      - name: Build front end
+        run: pnpm run build
+
+      - name: Start the app
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > storage/logs/serve.log 2>&1 &
+          curl --silent --fail --retry 30 --retry-connrefused --retry-delay 1 \
+            "$E2E_BASE_URL/up" > /dev/null
+
+      - name: Run Playwright on BrowserStack
+        run: pnpm test:browserstack
+        env:
+          BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+          BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          BROWSERSTACK_BUILD_NAME: meridian-consent-${{ github.head_ref || github.ref_name }}
+
+      - name: Upload report and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browserstack-report
+          path: |
+            playwright-report/
+            test-results/
+            log/
+            storage/logs/
+          retention-days: 14

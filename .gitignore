@@ -47,6 +47,9 @@ yarn-error.log
 # Playwright
 /test-results
 /playwright-report
+/log
+/local.log
+/browserstack.err
 /blob-report
 /playwright/.cache
 /playwright/.auth

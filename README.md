@@ -246,7 +246,7 @@ Last full run on 9 Nov 2026: every test below passed.
 - **Pest:** 239 tests (1,797 assertions) cover every consent rule and the admin portal. Time travel checks the 1-year and 1-day expiry.
 - **Playwright:** 95 tests cover consent, scroll lock, accessibility (axe), phone layout and the admin in desktop Chrome. The consent and phone-layout tests also run on an emulated Pixel 7. One test runs the whole story above: accept on the site, log in as admin, and find that cookie's GUID in the table.
 - **Test cases:** `tests/cases/*.yaml` lists every case and which brief rule it proves.
-- **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push.
+- **CI:** GitHub Actions runs lint, PHPStan, Pest on SQLite and MySQL 8, and the Playwright suite on every push. After a merge to main, or by hand, BrowserStack runs the consent and phone-layout tests on Edge, Firefox, WebKit and an iPhone.
 
 ```bash
 php artisan test                                  # Pest

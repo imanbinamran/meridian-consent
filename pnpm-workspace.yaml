@@ -1,5 +1,9 @@
 packages:
     - '.'
 
+# browserstack-node-sdk pulls this in. Its install script is not needed.
+allowBuilds:
+    protobufjs: false
+
 publicHoistPattern:
     - '@inertiajs/core'
