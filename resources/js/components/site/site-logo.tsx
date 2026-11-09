@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import type { SVGAttributes } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 
@@ -35,6 +36,8 @@ export function MeridianMark(props: SVGAttributes<SVGElement>) {
 }
 
 export function SiteLogo({ className }: { className?: string }) {
+    const { t } = useI18n();
+
     return (
         <Link
             href={home()}
@@ -47,7 +50,7 @@ export function SiteLogo({ className }: { className?: string }) {
             <span className="font-display text-[1.65rem] leading-none font-semibold tracking-tight">
                 Meridian
             </span>
-            <span className="sr-only">, home</span>
+            <span className="sr-only">{t('common.site.logo_home')}</span>
         </Link>
     );
 }

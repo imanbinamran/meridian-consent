@@ -1,20 +1,21 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { richText, useI18n } from '@/lib/i18n';
+import type { Params, RichTags } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { Kicker, MeridianLines } from './section-heading';
 
-export type LegalSection = {
+type LegalBlock = { p: string } | { ul: string[] } | { cookie_table: true };
+
+/** One section as it comes from lang/{locale}/site.php. */
+export type LegalSectionText = {
     id: string;
     title: string;
-    body: ReactNode;
+    blocks: LegalBlock[];
 };
 
-const updatedFormat = new Intl.DateTimeFormat('en-MY', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-});
+export type RenderCookieTable = () => ReactNode;
 
 /**
  * Shared shell for the Privacy Policy and the Terms & Conditions: a title
@@ -26,14 +27,27 @@ export function LegalDocument({
     intro,
     updated,
     sections,
+    params,
+    tags,
+    renderCookieTable,
 }: {
     kicker: string;
     title: string;
     intro: ReactNode;
     /** ISO date, e.g. 2026-11-08. */
     updated: string;
-    sections: LegalSection[];
+    sections: LegalSectionText[];
+    params?: Params;
+    tags?: RichTags;
+    renderCookieTable?: RenderCookieTable;
 }) {
+    const { t, intlLocale } = useI18n();
+    const updatedFormat = new Intl.DateTimeFormat(intlLocale, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+    const render = (text: string) => richText(text, params, tags);
     const active = useActiveSection(sections.map((section) => section.id));
     // Open beside the text on wide screens; folded away on phones so the
     // policy itself comes first.
@@ -56,7 +70,7 @@ export function LegalDocument({
                         {intro}
                     </div>
                     <p className="mt-6 text-sm text-muted-foreground">
-                        Last updated{' '}
+                        {t('common.legal.last_updated')}{' '}
                         <time
                             dateTime={updated}
                             className="font-medium text-foreground"
@@ -86,7 +100,7 @@ export function LegalDocument({
                                 id="toc-title"
                                 className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
                             >
-                                Contents
+                                {t('common.legal.contents')}
                             </h2>
                             <ChevronDown
                                 aria-hidden="true"
@@ -141,7 +155,33 @@ export function LegalDocument({
                                 {section.title}
                             </h2>
                             <div className="legal-prose mt-5">
-                                {section.body}
+                                {section.blocks.map((block, blockIndex) => {
+                                    if ('p' in block) {
+                                        return (
+                                            <p key={blockIndex}>
+                                                {render(block.p)}
+                                            </p>
+                                        );
+                                    }
+
+                                    if ('ul' in block) {
+                                        return (
+                                            <ul key={blockIndex}>
+                                                {block.ul.map((item) => (
+                                                    <li key={item}>
+                                                        {render(item)}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        );
+                                    }
+
+                                    return (
+                                        <Fragment key={blockIndex}>
+                                            {renderCookieTable?.()}
+                                        </Fragment>
+                                    );
+                                })}
                             </div>
                         </section>
                     ))}

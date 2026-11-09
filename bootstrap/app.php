@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\HandleLocale;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // They are HttpOnly, so page scripts cannot read them.
         $middleware->encryptCookies(except: [
             'appearance',
+            HandleLocale::COOKIE,
             'sidebar_state',
             'consent',
             'consent_declined',

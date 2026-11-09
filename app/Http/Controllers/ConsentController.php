@@ -24,12 +24,12 @@ class ConsentController extends Controller
             // The exception message holds the SQL and its bindings, so it stays out of the log.
             Log::warning('A consent choice could not be saved.', ['exception' => $exception::class]);
 
-            Inertia::flash('toast', ['type' => 'error', 'message' => __('We could not save your cookie choice. Please try again.')]);
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('site.toast.consent_save_failed')]);
 
             return redirect()->to($this->previousUrl());
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Thanks. Your cookie choice is saved.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('site.toast.consent_saved')]);
 
         return redirect()->to($this->previousUrl())
             ->withCookie($this->consent->acceptedCookie($consent, $request))
@@ -40,7 +40,7 @@ class ConsentController extends Controller
     {
         $declinedAt = $this->consent->decline($request);
 
-        Inertia::flash('toast', ['type' => 'info', 'message' => __('Understood. We will ask again tomorrow.')]);
+        Inertia::flash('toast', ['type' => 'info', 'message' => __('site.toast.consent_declined')]);
 
         return redirect()->to($this->previousUrl())
             ->withCookie($this->consent->declinedCookie($declinedAt, $request))

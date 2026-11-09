@@ -1,0 +1,286 @@
+# case-spec/1 · EN/BM language switch
+#
+# Layer tags on every case say who proves it:
+#   pest   -> tests/Feature/Pages/LanguageTest.php
+#   e2e    -> tests/e2e/language.spec.ts
+contract: case-spec/1
+title: Meridian · EN/BM language switch on the public site
+feature: Public visitors can read the whole site, the consent box and the articles in English or Bahasa Melayu
+status: ready
+owner: Amirul
+
+sources:
+    - {
+          id: S1,
+          kind: chat,
+          ref: 'Approved brief: public site only, admin stays English, cookie instead of URL prefixes',
+      }
+    - {
+          id: S2,
+          kind: code,
+          ref: 'config/consent.php (what counts as a wording change)',
+      }
+
+requirements:
+    - {
+          id: REQ-1,
+          text: 'A cookie holds the language. With no cookie the site is in English, whatever the browser asks for',
+          anchor: 'S1 how it should work',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-2,
+          text: 'Admin, sign-in and settings stay in English',
+          anchor: 'S1 scope',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-3,
+          text: 'Every public page, the consent box, toasts, validation messages and the articles follow the language, and it survives a reload',
+          anchor: 'S1 done means',
+          risk: { impact: 3, likelihood: 3 },
+      }
+    - {
+          id: REQ-4,
+          text: 'The consent box has its own switch, because it makes the page behind it unreachable',
+          anchor: 'S1 must not be missed 1',
+          risk: { impact: 3, likelihood: 3 },
+      }
+    - {
+          id: REQ-5,
+          text: 'Each consent record stores the language it was accepted in, and existing English consents stay valid',
+          anchor: 'S1 must not be missed 2; S2',
+          risk: { impact: 3, likelihood: 2 },
+      }
+    - {
+          id: REQ-6,
+          text: 'The Privacy page names the language cookie',
+          anchor: 'S1 must not be missed 3',
+          risk: { impact: 3, likelihood: 1 },
+      }
+    - {
+          id: REQ-7,
+          text: 'Dates and numbers follow the language, and the article headline morph still works',
+          anchor: 'S1 done means',
+          risk: { impact: 2, likelihood: 2 },
+      }
+    - {
+          id: REQ-8,
+          text: 'The English and Malay files stay in step: same keys, same placeholders, same story structure',
+          anchor: 'S1 how it should work',
+          risk: { impact: 2, likelihood: 3 },
+      }
+
+scope:
+    in: ['Public pages, consent box, articles, toasts, contact form errors']
+    out:
+        [
+            'Admin, sign-in and settings',
+            'Quality of the Malay wording, which a fluent person reviews',
+        ]
+
+roles:
+    - { id: visitor, description: 'A member of the public' }
+    - { id: admin, description: 'Signed-in staff member' }
+
+environments: [local, ci]
+
+fixtures:
+    - {
+          id: F1,
+          description: 'Seeded local database, Chromium desktop and Pixel 7 profiles',
+      }
+
+assumptions: []
+
+# Every case below uses: type functional, required true, role visitor unless noted.
+cases:
+    - {
+          id: LNG-001,
+          title: 'The saved language decides the page and html lang',
+          priority: P1,
+          requirement_refs: [REQ-1],
+          tags: [pest],
+      }
+    - {
+          id: LNG-002,
+          title: 'With no saved language the site is in English, whatever the browser asks for',
+          priority: P1,
+          requirement_refs: [REQ-1],
+          tags: [pest],
+      }
+    - {
+          id: LNG-003,
+          title: 'A made-up cookie value counts as no choice',
+          priority: P2,
+          requirement_refs: [REQ-1],
+          tags: [pest],
+      }
+    - {
+          id: LNG-004,
+          title: 'Sign-in and admin stay in English with no public words',
+          priority: P1,
+          requirement_refs: [REQ-2],
+          tags: [pest],
+      }
+    - {
+          id: LNG-005,
+          title: 'A public page gets the shared words and its own, no others',
+          priority: P3,
+          requirement_refs: [REQ-3],
+          tags: [pest],
+      }
+    - {
+          id: LNG-006,
+          title: 'An article reads in Malay at the same address',
+          priority: P1,
+          requirement_refs: [REQ-3],
+          tags: [pest],
+      }
+    - {
+          id: LNG-007,
+          title: 'Toasts and contact form errors follow the language',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [pest],
+      }
+    - {
+          id: LNG-008,
+          title: 'A consent record keeps the language it was accepted in',
+          priority: P1,
+          requirement_refs: [REQ-5],
+          tags: [pest],
+      }
+    - {
+          id: LNG-009,
+          title: 'Clicking Accept again in the other language keeps the original record',
+          priority: P2,
+          requirement_refs: [REQ-5],
+          tags: [pest],
+      }
+    - {
+          id: LNG-010,
+          title: 'Consents given before this feature stay valid in either language',
+          priority: P1,
+          requirement_refs: [REQ-5],
+          tags: [pest],
+      }
+    - {
+          id: LNG-011,
+          title: 'A row with no language recorded counts as English and stays active',
+          priority: P1,
+          requirement_refs: [REQ-5],
+          tags: [pest],
+      }
+    - {
+          id: LNG-012,
+          title: 'The Privacy page names the language cookie in both languages',
+          priority: P1,
+          requirement_refs: [REQ-6],
+          tags: [pest],
+      }
+    - {
+          id: LNG-013,
+          title: 'The English and Malay word files have the same shape',
+          priority: P2,
+          requirement_refs: [REQ-8],
+          tags: [pest],
+      }
+    - {
+          id: LNG-014,
+          title: 'Every word key the pages ask for exists',
+          priority: P2,
+          requirement_refs: [REQ-8],
+          tags: [pest],
+      }
+    - {
+          id: LNG-015,
+          title: 'Every story has a Malay version with the same structure',
+          priority: P1,
+          requirement_refs: [REQ-8],
+          tags: [pest],
+      }
+    - {
+          id: LNG-020,
+          title: 'The consent box has its own switch and stays open',
+          priority: P1,
+          requirement_refs: [REQ-4],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-021,
+          title: 'A Malay browser sees English until the visitor chooses BM',
+          priority: P1,
+          requirement_refs: [REQ-1],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-022,
+          title: 'Each public page reads in BM and stays BM after a reload',
+          priority: P1,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-023,
+          title: 'The date and figures follow the language',
+          priority: P2,
+          requirement_refs: [REQ-7],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-024,
+          title: 'The headline still moves into the article in BM',
+          priority: P2,
+          requirement_refs: [REQ-7],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-025,
+          title: 'A page fetched ahead in English is not shown after switching',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-026,
+          title: 'Going Back after switching shows the new language',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-027,
+          title: 'Sign-in stays in English after reading in BM',
+          priority: P1,
+          requirement_refs: [REQ-2],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-028,
+          title: 'Accepting in BM thanks the visitor in BM',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-029,
+          title: 'Each public page has no sideways scroll in BM at 320px',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-030,
+          title: 'The BM consent box has no serious accessibility issues',
+          priority: P2,
+          requirement_refs: [REQ-4],
+          tags: [e2e],
+      }
+    - {
+          id: LNG-031,
+          title: 'The back to top button follows the language',
+          priority: P2,
+          requirement_refs: [REQ-3],
+          tags: [e2e],
+      }

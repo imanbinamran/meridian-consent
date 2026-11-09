@@ -77,7 +77,7 @@ it('never stores or logs the raw user agent or IP address', function () {
         ->and($stored)->not->toContain($ip)
         ->and(array_keys(Consent::sole()->getAttributes()))->toEqualCanonicalizing([
             'id', 'guid', 'version', 'accepted_at', 'created_at', 'updated_at', 'withdrawn_at',
-            'device_type', 'browser_family', 'os_family',
+            'device_type', 'browser_family', 'os_family', 'locale',
         ]);
 
     Log::shouldNotHaveReceived('warning');

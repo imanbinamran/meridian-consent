@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $device_type
  * @property string|null $browser_family
  * @property string|null $os_family
+ * @property string $locale
  */
 class Consent extends Model
 {
@@ -42,6 +43,7 @@ class Consent extends Model
         'device_type',
         'browser_family',
         'os_family',
+        'locale',
     ];
 
     protected function casts(): array

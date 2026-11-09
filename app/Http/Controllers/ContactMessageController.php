@@ -24,7 +24,7 @@ class ContactMessageController extends Controller
             'message' => ['required', 'string', 'min:20', 'max:5000'],
         ]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Thanks. Your message has reached the newsroom.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('site.toast.contact_sent')]);
 
         return to_route('about');
     }
