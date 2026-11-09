@@ -17,7 +17,6 @@ import {
     declineConsent,
     decodeCookieValue,
     expectConsentBox,
-    expectDockedConsentBox,
     expectNoConsentBox,
     getCookie,
     nowSeconds,
@@ -93,7 +92,7 @@ test.describe('first visit', () => {
 
         await termsLink.click();
         await expect(page).toHaveURL(/\/terms$/);
-        await expectDockedConsentBox(page);
+        await expectConsentBox(page);
 
         await page.goBack();
         await expect(page).toHaveURL(/\/$/);
@@ -101,12 +100,14 @@ test.describe('first visit', () => {
             .getByRole('link', { name: 'Privacy Statement', exact: true })
             .click();
         await expect(page).toHaveURL(/\/privacy$/);
-        await expectDockedConsentBox(page);
+        await expectConsentBox(page);
     });
 });
 
 test.describe('reading Terms or Privacy before choosing', () => {
     const html = (page: Page) => page.locator('html');
+    const reader = (page: Page, name = 'Terms & Conditions') =>
+        consentDialog(page).getByRole('region', { name });
 
     async function followTermsLink(page: Page) {
         await page.goto('/');
@@ -115,67 +116,73 @@ test.describe('reading Terms or Privacy before choosing', () => {
             .getByRole('link', { name: 'Terms & Conditions', exact: true })
             .click();
         await expect(page).toHaveURL(/\/terms$/);
-        await expect(html(page)).not.toHaveClass(/consent-locked/);
+        await expect(reader(page)).toBeVisible();
     }
 
-    test('CON-013 following a box link docks the box and the page scrolls', async ({
+    test('CON-013 a box link opens the document in the box and only the text scrolls', async ({
         page,
+        context,
     }) => {
-        const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
-        await page.setViewportSize({ width: viewport.width, height: 500 });
         await followTermsLink(page);
+        await expectConsentBox(page);
+        await expect(html(page)).toHaveClass(/consent-locked/);
+        await expect(reader(page)).toBeFocused();
 
-        const dialog = await expectDockedConsentBox(page);
-        await expect(page.locator('main')).not.toHaveAttribute('inert');
-        await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
-
-        await page.mouse.move(viewport.width / 2, 100);
+        const box = await reader(page).boundingBox();
+        await page.mouse.move(box!.x + box!.width / 2, box!.y + 40);
         await expect
             .poll(async () => {
                 await page.mouse.wheel(0, 600);
 
-                return page.evaluate(() => window.scrollY);
+                return reader(page).evaluate((el) => el.scrollTop);
             })
             .toBeGreaterThan(0);
 
-        // Still pinned in view, and nothing recorded until they choose.
-        await expect(dialog).toBeInViewport();
-        expect(
-            await getCookie(page.context(), ACCEPTED_COOKIE),
-        ).toBeUndefined();
-        expect(
-            await getCookie(page.context(), DECLINED_COOKIE),
-        ).toBeUndefined();
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        expect(await getCookie(context, ACCEPTED_COOKIE)).toBeUndefined();
+        expect(await getCookie(context, DECLINED_COOKIE)).toBeUndefined();
     });
 
-    test('CON-014 the bottom of the page is not hidden by the docked box', async ({
+    test('CON-014 the end of the document can be reached and the choices stay in view', async ({
         page,
     }) => {
         await followTermsLink(page);
-        await expectDockedConsentBox(page);
-        await page.evaluate(() =>
-            window.scrollTo(0, document.documentElement.scrollHeight),
+        const dialog = await expectConsentBox(page);
+        await reader(page).evaluate((el) => {
+            el.scrollTop = el.scrollHeight;
+        });
+
+        await expect(
+            reader(page).locator('section').last().getByRole('heading'),
+        ).toBeInViewport();
+        await expect(
+            dialog.getByRole('button', { name: 'Accept', exact: true }),
+        ).toBeInViewport();
+        await expect(
+            dialog.getByRole('button', { name: 'Decline', exact: true }),
+        ).toBeInViewport();
+
+        const overflow = await reader(page).evaluate(
+            (el) => el.scrollWidth - el.clientWidth,
         );
-
-        const footer = await page.locator('footer').last().boundingBox();
-        const box = await consentDialog(page).boundingBox();
-
-        expect(footer && box).toBeTruthy();
-        expect(footer!.y + footer!.height).toBeLessThanOrEqual(box!.y + 1);
+        expect(overflow).toBeLessThanOrEqual(0);
     });
 
     for (const [label, leave] of [
         ['going back', (page: Page) => page.goBack()],
         ['refreshing', (page: Page) => page.reload()],
     ] as const) {
-        test(`CON-015 ${label} brings back the full box and the lock`, async ({
+        test(`CON-015 ${label} brings back the notice and the lock`, async ({
             page,
         }) => {
             await followTermsLink(page);
-            await expectDockedConsentBox(page);
             await leave(page);
 
-            await expect(page.locator('[role="alertdialog"]')).toBeVisible();
+            const dialog = await expectConsentBox(page);
+            await expect(reader(page)).toHaveCount(0);
+            expect((await dialog.innerText()).replace(/\s+/g, ' ')).toContain(
+                COPY.first,
+            );
             await expect(html(page)).toHaveClass(/consent-locked/);
         });
     }
@@ -184,12 +191,12 @@ test.describe('reading Terms or Privacy before choosing', () => {
         ['Accept', 'Accept', ACCEPTED_COOKIE],
         ['Decline', 'Decline', DECLINED_COOKIE],
     ] as const) {
-        test(`CON-016 ${label} from the docked box records the choice`, async ({
+        test(`CON-016 ${label} from the reader records the choice`, async ({
             page,
             context,
         }) => {
             await followTermsLink(page);
-            const dialog = await expectDockedConsentBox(page);
+            const dialog = await expectConsentBox(page);
             await dialog
                 .getByRole('button', { name: choose, exact: true })
                 .click();
@@ -197,29 +204,13 @@ test.describe('reading Terms or Privacy before choosing', () => {
             await waitForCookie(context, cookie);
             await expectNoConsentBox(page);
             await expect(page).toHaveURL(/\/terms$/);
+            await expect(html(page)).not.toHaveClass(/consent-locked/);
 
             await page.goto('/');
             await waitForPublicPage(page);
             await expectNoConsentBox(page);
         });
     }
-
-    test('CON-018 the docked box has no serious accessibility issues', async ({
-        page,
-    }) => {
-        await followTermsLink(page);
-        await expectDockedConsentBox(page);
-        await settleAnimations(page);
-
-        const results = await new AxeBuilder({ page })
-            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-            .analyze();
-        const serious = results.violations
-            .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-            .map((v) => v.id);
-
-        expect(serious).toEqual([]);
-    });
 
     test('CON-017 a link in the reopened box closes it so the page can be read', async ({
         page,
@@ -237,6 +228,49 @@ test.describe('reading Terms or Privacy before choosing', () => {
             .click();
         await expect(page).toHaveURL(/\/terms$/);
         await expectNoConsentBox(page);
+    });
+
+    test('CON-018 the reader has no serious accessibility issues', async ({
+        page,
+    }) => {
+        await followTermsLink(page);
+        await settleAnimations(page);
+
+        const results = await new AxeBuilder({ page })
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+            .analyze();
+        const serious = results.violations
+            .filter((v) => v.impact === 'serious' || v.impact === 'critical')
+            .map((v) => v.id);
+
+        expect(serious).toEqual([]);
+    });
+
+    test('CON-019 Back to notice shows the two required sentences again', async ({
+        page,
+    }) => {
+        await followTermsLink(page);
+        const dialog = consentDialog(page);
+        await dialog.getByRole('button', { name: 'Back to notice' }).click();
+
+        await expect(reader(page)).toHaveCount(0);
+        await expect(page).toHaveURL(/\/terms$/);
+        const text = (await dialog.innerText()).replace(/\s+/g, ' ');
+        expect(text).toContain(COPY.first);
+        expect(text).toContain(COPY.second);
+        await expect(dialog).toBeFocused();
+    });
+
+    test('CON-094 a link to the other document stays in the reader', async ({
+        page,
+    }) => {
+        await followTermsLink(page);
+        await reader(page).locator('a[href$="/privacy"]').first().click();
+
+        await expect(page).toHaveURL(/\/privacy$/);
+        await expect(reader(page, 'Privacy Policy')).toBeVisible();
+        await expect(reader(page, 'Privacy Policy')).toBeFocused();
+        await expect(html(page)).toHaveClass(/consent-locked/);
     });
 });
 

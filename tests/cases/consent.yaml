@@ -434,7 +434,7 @@ cases:
                 id: A3,
                 kind: ui,
                 description: Box still shown on target,
-                expected: "The 'Cookie consent' dialog is visible on /terms and /privacy, docked at the bottom, since no choice was made",
+                expected: "The 'Cookie consent' dialog is visible on /terms and /privacy, as a reader inside the box, since no choice was made",
                 provenance: REQ-3,
             }
       tags: [e2e]
@@ -1795,33 +1795,40 @@ cases:
       tags: [e2e]
 
     - id: CON-013
-      title: Following a box link docks the box and the page scrolls
+      title: A box link opens the document in the box and only the text scrolls
       type: web
       scenario_class: ui_state
       priority: P1
       technique: happy_path
       required: true
       mutates: none
-      requirement_refs: [REQ-3, REQ-6]
+      requirement_refs: [REQ-3, REQ-4, REQ-6]
       role: visitor
       preconditions: ['Fresh browser context']
       steps:
           - Open /
           - Activate the 'Terms & Conditions' link in the box
-          - Scroll the page
+          - Scroll inside the box
       assertions:
           - {
                 id: A1,
                 kind: ui,
-                description: Unlocked,
-                expected: 'The html element no longer has the scroll lock and the page scrolls past 0',
+                description: Reader,
+                expected: 'URL path is /terms and the box shows the document in a focused scrolling region',
                 provenance: REQ-6,
             }
           - {
                 id: A2,
                 kind: ui,
+                description: Still locked,
+                expected: 'The text scrolls, window.scrollY stays 0, the html element keeps the scroll lock',
+                provenance: REQ-4,
+            }
+          - {
+                id: A3,
+                kind: ui,
                 description: Choice still owed,
-                expected: 'The Cookie consent dialog stays in view with Accept and Decline, and no consent cookie exists',
+                expected: 'Accept and Decline are visible and no consent cookie exists',
                 provenance: REQ-3,
             }
       cleanup: 'Context closed at the end of the test'
@@ -1829,25 +1836,39 @@ cases:
       notes: 'consent.spec.ts'
 
     - id: CON-014
-      title: The docked box does not hide the end of the page
+      title: The end of the document can be reached and the choices stay in view
       type: web
       scenario_class: ui_state
       priority: P2
       technique: boundary_value
       required: true
       mutates: none
-      requirement_refs: [REQ-2]
+      requirement_refs: [REQ-2, REQ-3]
       role: visitor
       preconditions: ['Fresh browser context']
       steps:
           - Follow a box link to /terms
-          - Scroll to the end of the page
+          - Scroll the reader to its end
       assertions:
           - {
                 id: A1,
                 kind: ui,
-                description: Footer clear,
-                expected: 'The footer ends at or above the top edge of the docked box',
+                description: End reachable,
+                expected: 'The last section heading is in the viewport',
+                provenance: REQ-2,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Choices,
+                expected: 'Accept and Decline are in the viewport',
+                provenance: REQ-3,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: No sideways scroll,
+                expected: 'The reader has no horizontal overflow',
                 provenance: REQ-2,
             }
       cleanup: 'Context closed at the end of the test'
@@ -1855,14 +1876,14 @@ cases:
       notes: 'consent.spec.ts'
 
     - id: CON-015
-      title: Going back or refreshing brings back the full box and lock
+      title: Going back or refreshing brings back the notice and the lock
       type: web
       scenario_class: ui_state
       priority: P1
       technique: negative
       required: true
       mutates: none
-      requirement_refs: [REQ-3, REQ-4]
+      requirement_refs: [REQ-3, REQ-4, REQ-5]
       role: visitor
       preconditions: ['Fresh browser context']
       steps:
@@ -1872,8 +1893,15 @@ cases:
           - {
                 id: A1,
                 kind: ui,
-                description: Gate restored,
-                expected: 'The blocking alertdialog is visible and the html element has the scroll lock',
+                description: Notice,
+                expected: 'The box shows the required copy and no reader',
+                provenance: REQ-5,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Lock,
+                expected: 'The html element has the scroll lock',
                 provenance: REQ-4,
             }
       cleanup: 'Context closed at the end of the test'
@@ -1881,7 +1909,7 @@ cases:
       notes: 'consent.spec.ts'
 
     - id: CON-016
-      title: Accept or Decline from the docked box records the choice
+      title: Accept or Decline from the reader records the choice
       type: web
       scenario_class: ui_state
       priority: P1
@@ -1893,13 +1921,13 @@ cases:
       preconditions: ['Fresh browser context']
       steps:
           - Follow a box link to /terms
-          - Activate Accept or Decline in the docked box
+          - Activate Accept or Decline in the box
       assertions:
           - {
                 id: A1,
                 kind: ui,
                 description: Recorded,
-                expected: 'The matching consent cookie is set, the box is gone, the visitor stays on /terms',
+                expected: 'The matching consent cookie is set, the box is gone, the lock is gone and the visitor stays on /terms',
                 provenance: REQ-3,
             }
           - {
@@ -1941,7 +1969,7 @@ cases:
       notes: 'consent.spec.ts'
 
     - id: CON-018
-      title: The docked box has no serious accessibility issues
+      title: The reader has no serious accessibility issues
       type: web
       scenario_class: render
       priority: P2
@@ -1961,6 +1989,58 @@ cases:
                 description: Axe,
                 expected: 'No serious or critical WCAG 2.2 AA violations',
                 provenance: REQ-2,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-019
+      title: Back to notice shows the two required sentences again
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-5]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Activate Back to notice
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Notice,
+                expected: 'The box shows both required sentences, no reader, and the box has focus',
+                provenance: REQ-5,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-094
+      title: A link to the other document stays in the reader
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-6]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Activate the link to the Privacy page inside the document
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Reader,
+                expected: 'URL path is /privacy, the box shows the Privacy Policy with focus on the text, and the page stays locked',
+                provenance: REQ-6,
             }
       cleanup: 'Context closed at the end of the test'
       tags: [e2e]

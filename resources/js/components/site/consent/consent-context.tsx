@@ -13,6 +13,7 @@ import { privacy, terms } from '@/routes';
 import { accept, decline } from '@/routes/consent';
 
 export type ConsentChoice = 'accepted' | 'declined';
+export type LegalDocumentName = 'terms' | 'privacy';
 
 /** Shared by HandleInertiaRequests on every Inertia response. */
 export type ConsentProps = {
@@ -25,10 +26,12 @@ export type ConsentProps = {
 
 type ConsentContextValue = {
     consent: ConsentProps;
-    /** The blocking box: the page behind it is locked and inert. */
     open: boolean;
-    /** The visitor is reading Terms or Privacy, with the choice still owed. */
-    docked: boolean;
+    /** The document being read inside the box, with the choice still owed. */
+    reading: LegalDocumentName | null;
+    /** Where the legal page draws its text while the box is the reader. */
+    readerSlot: HTMLElement | null;
+    setReaderSlot: (element: HTMLElement | null) => void;
     /** True when the visitor reopened the box and may close it again. */
     dismissible: boolean;
     pending: ConsentChoice | null;
@@ -37,6 +40,7 @@ type ConsentContextValue = {
     close: () => void;
     /** Call once a link inside the box has landed on its page. */
     followedLegalLink: () => void;
+    stopReading: () => void;
 };
 
 const ConsentContext = createContext<ConsentContextValue | null>(null);
@@ -44,32 +48,40 @@ const ConsentContext = createContext<ConsentContextValue | null>(null);
 /** Matches the class app.blade.php sets before React loads. */
 const LOCK_CLASS = 'consent-locked';
 
-function isLegalPage(url: string): boolean {
+function legalDocumentAt(url: string): LegalDocumentName | null {
     const path = url.split(/[?#]/)[0];
 
-    return path === terms.url() || path === privacy.url();
+    if (path === terms.url()) {
+        return 'terms';
+    }
+
+    return path === privacy.url() ? 'privacy' : null;
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
     const page = usePage();
     const consent = page.props.consent as ConsentProps;
-    const onLegalPage = isLegalPage(page.url);
+    const legalDocument = legalDocumentAt(page.url);
     const [reopened, setReopened] = useState(false);
-    const [reading, setReading] = useState(false);
+    const [wantsToRead, setWantsToRead] = useState(false);
+    const [readerSlot, setReaderSlot] = useState<HTMLElement | null>(null);
     const [pending, setPending] = useState<ConsentChoice | null>(null);
     // Guards against a double click landing before React re-renders.
     const inFlight = useRef(false);
 
-    // Leaving the legal pages ends reading mode, so the full box comes back.
-    if (reading && !onLegalPage) {
-        setReading(false);
+    // Leaving the legal pages ends reading, so the notice comes back.
+    if (wantsToRead && !legalDocument) {
+        setWantsToRead(false);
     }
 
-    // Only a click on a link in the box docks it. Opening /terms directly, or
-    // refreshing it, still shows the full box with the page locked.
-    const docked =
-        consent.enabled && consent.required && reading && onLegalPage;
-    const open = consent.enabled && (consent.required || reopened) && !docked;
+    const open = consent.enabled && (consent.required || reopened);
+
+    // Only a click on a link in the box turns it into the reader. Opening
+    // /terms directly, or refreshing it, still shows the notice.
+    const reading =
+        consent.enabled && consent.required && wantsToRead
+            ? legalDocument
+            : null;
 
     useEffect(() => {
         document.documentElement.classList.toggle(LOCK_CLASS, open);
@@ -100,7 +112,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
                 onStart: () => setPending(choice),
                 onSuccess: () => {
                     setReopened(false);
-                    setReading(false);
+                    setWantsToRead(false);
                 },
                 onFinish: () => {
                     inFlight.current = false;
@@ -113,12 +125,14 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     const value: ConsentContextValue = {
         consent,
         open,
-        docked,
+        reading,
+        readerSlot,
+        setReaderSlot,
         dismissible: !consent.required,
         pending,
         choose,
         reopen: () => {
-            setReading(false);
+            setWantsToRead(false);
             setReopened(true);
         },
         close: () => {
@@ -128,8 +142,9 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
         },
         followedLegalLink: () => {
             setReopened(false);
-            setReading(consent.required);
+            setWantsToRead(consent.required);
         },
+        stopReading: () => setWantsToRead(false),
     };
 
     return <ConsentContext value={value}>{children}</ConsentContext>;

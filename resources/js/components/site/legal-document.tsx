@@ -1,6 +1,8 @@
 import { ChevronDown } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useConsent } from '@/components/site/consent/consent-context';
 import { richText, useI18n } from '@/lib/i18n';
 import type { Params, RichTags } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -42,6 +44,7 @@ export function LegalDocument({
     renderCookieTable?: RenderCookieTable;
 }) {
     const { t, intlLocale } = useI18n();
+    const { readerSlot } = useConsent();
     const updatedFormat = new Intl.DateTimeFormat(intlLocale, {
         day: 'numeric',
         month: 'long',
@@ -135,60 +138,84 @@ export function LegalDocument({
                 </nav>
 
                 <article className="min-w-0 lg:col-span-8 xl:col-span-9 xl:max-w-3xl">
-                    {sections.map((section, index) => (
-                        <section
-                            key={section.id}
-                            id={section.id}
-                            aria-labelledby={`${section.id}-title`}
-                            className="scroll-mt-32 border-t border-foreground/10 py-10 first:border-t-0 first:pt-0"
-                        >
-                            <h2
-                                id={`${section.id}-title`}
-                                className="flex items-baseline gap-3 font-display text-2xl leading-tight font-medium tracking-tight sm:text-[1.75rem]"
-                            >
-                                <span
-                                    aria-hidden="true"
-                                    className="font-sans text-sm font-semibold text-brand tabular-nums"
-                                >
-                                    {String(index + 1).padStart(2, '0')}
-                                </span>
-                                {section.title}
-                            </h2>
-                            <div className="legal-prose mt-5">
-                                {section.blocks.map((block, blockIndex) => {
-                                    if ('p' in block) {
-                                        return (
-                                            <p key={blockIndex}>
-                                                {render(block.p)}
-                                            </p>
-                                        );
-                                    }
-
-                                    if ('ul' in block) {
-                                        return (
-                                            <ul key={blockIndex}>
-                                                {block.ul.map((item) => (
-                                                    <li key={item}>
-                                                        {render(item)}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        );
-                                    }
-
-                                    return (
-                                        <Fragment key={blockIndex}>
-                                            {renderCookieTable?.()}
-                                        </Fragment>
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    ))}
+                    <LegalSections
+                        sections={sections}
+                        render={render}
+                        renderCookieTable={renderCookieTable}
+                    />
                 </article>
             </div>
+
+            {readerSlot &&
+                createPortal(
+                    <LegalSections
+                        idPrefix="reader-"
+                        sections={sections}
+                        render={render}
+                        renderCookieTable={renderCookieTable}
+                    />,
+                    readerSlot,
+                )}
         </>
     );
+}
+
+function LegalSections({
+    sections,
+    render,
+    renderCookieTable,
+    idPrefix = '',
+}: {
+    sections: LegalSectionText[];
+    render: (text: string) => ReactNode;
+    renderCookieTable?: RenderCookieTable;
+    /** Keeps ids unique when the text also appears in the consent box. */
+    idPrefix?: string;
+}) {
+    return sections.map((section, index) => (
+        <section
+            key={section.id}
+            id={`${idPrefix}${section.id}`}
+            aria-labelledby={`${idPrefix}${section.id}-title`}
+            className="scroll-mt-32 border-t border-foreground/10 py-10 first:border-t-0 first:pt-0 last:pb-0"
+        >
+            <h2
+                id={`${idPrefix}${section.id}-title`}
+                className="flex items-baseline gap-3 font-display text-2xl leading-tight font-medium tracking-tight sm:text-[1.75rem]"
+            >
+                <span
+                    aria-hidden="true"
+                    className="font-sans text-sm font-semibold text-brand tabular-nums"
+                >
+                    {String(index + 1).padStart(2, '0')}
+                </span>
+                {section.title}
+            </h2>
+            <div className="legal-prose mt-5">
+                {section.blocks.map((block, blockIndex) => {
+                    if ('p' in block) {
+                        return <p key={blockIndex}>{render(block.p)}</p>;
+                    }
+
+                    if ('ul' in block) {
+                        return (
+                            <ul key={blockIndex}>
+                                {block.ul.map((item) => (
+                                    <li key={item}>{render(item)}</li>
+                                ))}
+                            </ul>
+                        );
+                    }
+
+                    return (
+                        <Fragment key={blockIndex}>
+                            {renderCookieTable?.()}
+                        </Fragment>
+                    );
+                })}
+            </div>
+        </section>
+    ));
 }
 
 /** The id of the section nearest the top of the viewport. */
