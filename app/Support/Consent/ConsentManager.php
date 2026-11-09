@@ -90,14 +90,16 @@ final class ConsentManager
     /**
      * Record a decline. A visitor holding a verified cookie is withdrawing a
      * consent we can point to, so that record is marked and the trail extended.
-     * Anyone else is counted, never identified, and a visitor who already
-     * declined within the last day is not counted twice.
+     * This holds for a cookie from an older notice too: it no longer counts as
+     * a choice, but its record still has to stop being live. Anyone else is
+     * counted, never identified, and a visitor who already declined within the
+     * last day is not counted twice.
      */
     public function decline(Request $request): CarbonImmutable
     {
         $now = $this->now();
         $declinedAt = $now->startOfSecond();
-        $cookie = $this->acceptedFromCookie($request, $now);
+        $cookie = $this->acceptedFromCookie($request, $now, minimumVersion: null);
 
         if ($cookie !== null && $this->withdraw($cookie, $declinedAt)) {
             return $this->declinedAt($request, $now) ?? $declinedAt;
@@ -156,7 +158,7 @@ final class ConsentManager
      */
     private function verifiedAccepted(Request $request, CarbonImmutable $now): ?AcceptedConsent
     {
-        $cookie = $this->acceptedFromCookie($request, $now);
+        $cookie = $this->acceptedFromCookie($request, $now, $this->version());
 
         if ($cookie === null) {
             return null;
@@ -176,12 +178,12 @@ final class ConsentManager
         return $record === null ? null : AcceptedConsent::fromRecord($record);
     }
 
-    private function acceptedFromCookie(Request $request, CarbonImmutable $now): ?AcceptedConsent
+    private function acceptedFromCookie(Request $request, CarbonImmutable $now, ?int $minimumVersion): ?AcceptedConsent
     {
         return AcceptedConsent::fromCookie(
             $request->cookie($this->acceptedCookieName()),
             $now,
-            $this->version(),
+            $minimumVersion,
             $this->acceptedLifetime(),
         );
     }

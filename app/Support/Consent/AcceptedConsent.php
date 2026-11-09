@@ -32,12 +32,13 @@ final readonly class AcceptedConsent
     /**
      * Read a cookie value. Anything malformed, out of date or expired returns
      * null, so the visitor is asked again. This checks the format only: the
-     * value is not trusted until ConsentManager has matched it to a row.
+     * value is not trusted until ConsentManager has matched it to a row. A
+     * null minimum accepts any version, for a caller that checks the row.
      */
     public static function fromCookie(
         mixed $value,
         CarbonImmutable $now,
-        int $minimumVersion,
+        ?int $minimumVersion,
         int $lifetimeDays,
     ): ?self {
         if (! is_string($value) || $value === '' || strlen($value) > 512) {
@@ -62,7 +63,7 @@ final readonly class AcceptedConsent
             return null;
         }
 
-        if ($version < $minimumVersion) {
+        if ($minimumVersion !== null && $version < $minimumVersion) {
             return null;
         }
 

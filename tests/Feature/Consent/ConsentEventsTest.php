@@ -146,6 +146,36 @@ it('treats a decline with a forged cookie as a plain decline', function () {
         ->and(Consent::count())->toBe(0);
 });
 
+// CON-091
+it('withdraws a matching cookie from an older notice and adds no decline', function () {
+    $value = recordedCookieValue(['version' => 1]);
+    config(['consent.version' => 2]);
+
+    $response = $this->withUnencryptedCookie('consent', $value)->post(route('consent.decline'));
+
+    $record = Consent::sole();
+    $event = ConsentEvent::query()->where('type', 'withdrawn')->sole();
+
+    expect($record->withdrawn_at->toIso8601ZuluString())->toBe('2026-11-08T09:30:15Z')
+        ->and($event->guid)->toBe($record->guid)
+        ->and($event->version)->toBe(1)
+        ->and(ConsentDecline::count())->toBe(0)
+        ->and(consentCookie($response)->getValue())->toBeNull();
+});
+
+// CON-091
+it('treats an older-notice cookie that matches no row as a plain decline', function () {
+    recordedCookieValue(['version' => 1]);
+    config(['consent.version' => 2]);
+    $altered = acceptedCookieValue(['version' => 1, 'accepted_at' => now()->subHour()->toIso8601ZuluString()]);
+
+    $this->withUnencryptedCookie('consent', $altered)->post(route('consent.decline'));
+
+    expect(Consent::sole()->withdrawn_at)->toBeNull()
+        ->and(ConsentEvent::query()->where('type', 'withdrawn')->count())->toBe(0)
+        ->and(ConsentDecline::count())->toBe(1);
+});
+
 // CON-086
 it('backfills one accepted event per existing consent', function () {
     $migration = require database_path('migrations/2026_11_09_000001_add_withdrawals_and_consent_events.php');
