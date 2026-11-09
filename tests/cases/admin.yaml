@@ -87,7 +87,7 @@ requirements:
       risk: { impact: 3, likelihood: 2 }
 
     - id: REQ-14
-      text: Each consents table row shows a Status badge (Active or Withdrawn) and a Device summary, with Unknown where nothing was recorded
+      text: Each consents table row shows a Status badge (Active, Expired or Withdrawn) and a Device summary, with Unknown where nothing was recorded
       anchor: 'S4 status badge and device column'
       risk: { impact: 2, likelihood: 2 }
     - id: REQ-15
@@ -109,6 +109,10 @@ requirements:
     - id: REQ-19
       text: The consent records UI works at 320px and desktop widths in light and dark mode
       anchor: 'S4 UI check'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-20
+      text: A consent past its 365-day lifetime or on an older notice version reads Expired in the badge, record page, status filter and CSV; Withdrawn wins over Expired
+      anchor: 'S3 config/consent.php'
       risk: { impact: 2, likelihood: 2 }
 
 scope:
@@ -146,6 +150,10 @@ fixtures:
       text: 'Consents for Pest: 30 rows version 1 dated 2026-10-01..2026-10-30 and 5 rows version 2 dated 2026-11-01..2026-11-05, plus 4 consent_declines rows'
       setup: 'Consent and ConsentDecline factories under RefreshDatabase'
       cleanup: 'Rolled back by RefreshDatabase'
+    - id: F5
+      text: 'One consent accepted on 2025-01-01, GUID 00000000-0000-4000-8000-000000000365, from ExpiredConsentSeeder (called by DatabaseSeeder)'
+      setup: 'php artisan db:seed'
+      cleanup: 'none needed: seed data'
     - id: F3
       text: 'Two fresh acceptances made through the public site in separate browser contexts during the e2e test'
       setup: 'Open / in a new context and click Accept, twice'
@@ -1181,7 +1189,7 @@ cases:
       role: admin
       preconditions: [Fixture F1, Fixture F4, 'Logged in as admin']
       steps:
-          - At 320px and 1280px wide, in light and dark mode, open /admin, /admin/consents and a record page
+          - At 320px and 1280px wide, in light and dark mode, open /admin, /admin/consents, a record page, /admin/consents?status=expired and the expired record page
       assertions:
           - {
                 id: A1,
@@ -1200,3 +1208,43 @@ cases:
       cleanup: 'none needed: see Fixture F4'
       tags: [e2e]
       notes: 'admin.spec.ts.'
+
+    - id: ADM-054
+      title: A consent past its lifetime or notice version reads Expired everywhere, and Withdrawn wins
+      type: hybrid
+      scenario_class: persistence
+      priority: P1
+      technique: boundary
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-20]
+      role: admin
+      preconditions: ['Logged in as admin', Fixture F5]
+      steps:
+          - Pest - load the table, filter, record page and CSV with rows at 365 days less a second, at exactly 365 days, on an older notice, and withdrawn
+          - e2e - choose Expired, search the seeded GUID, export it and open its record
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Boundary,
+                expected: 'A row at 365 days less a second is active and at exactly 365 days is expired; an older notice is expired at any age',
+                provenance: REQ-20,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Withdrawn wins,
+                expected: 'A withdrawn row that is also old or on an older notice reads withdrawn and is left out of the Expired filter',
+                provenance: REQ-20,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Everywhere,
+                expected: "The row and the record page read 'Expired', and the CSV line has status expired",
+                provenance: REQ-20,
+            }
+      cleanup: 'Rolled back by RefreshDatabase; the seeded row stays'
+      tags: [pest, e2e]
+      notes: 'ConsentStatusTest.php and admin.spec.ts. ADM-053 runs the axe check on the Expired badge.'
