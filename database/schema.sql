@@ -3,7 +3,8 @@
 -- The migrations in database/migrations are the source of truth; this file is for reviewers
 -- and for setting up the database without PHP: mysql meridian < database/schema.sql
 
-/*M!999999\- enable the sandbox mode */ 
+SET FOREIGN_KEY_CHECKS=0;
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cache` (
@@ -59,6 +60,7 @@ CREATE TABLE `consents` (
   `device_type` varchar(16) DEFAULT NULL,
   `browser_family` varchar(16) DEFAULT NULL,
   `os_family` varchar(16) DEFAULT NULL,
+  `locale` varchar(8) NOT NULL DEFAULT 'en',
   PRIMARY KEY (`id`),
   UNIQUE KEY `consents_guid_unique` (`guid`),
   KEY `consents_accepted_at_index` (`accepted_at`),
@@ -177,3 +179,5 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_email_unique` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+SET FOREIGN_KEY_CHECKS=1;
