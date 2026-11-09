@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\ConsentsChanged;
 use App\Http\Controllers\Controller;
 use App\Models\Consent;
 use App\Models\ConsentDecline;
@@ -36,6 +37,7 @@ class OverviewController extends Controller
 
         return Inertia::render('admin/overview', [
             'timezone' => $timezone,
+            'realtime' => $this->realtime(),
             'stats' => [
                 'totalAccepted' => Consent::query()->count(),
                 'totalDeclined' => ConsentDecline::query()->count(),
@@ -71,6 +73,31 @@ class OverviewController extends Controller
                     'acceptedAt' => $consent->accepted_at->toIso8601ZuluString(),
                 ]),
         ]);
+    }
+
+    /**
+     * What the browser needs to reach Reverb, or null when live updates are
+     * off. It comes from the server, not a VITE_ variable, so turning them on
+     * needs no rebuild. The app key and host are public; the secret stays here.
+     *
+     * @return array{key: string, host: string, port: int, scheme: string, channel: string, event: string}|null
+     */
+    private function realtime(): ?array
+    {
+        if (! ConsentsChanged::liveUpdatesOn()) {
+            return null;
+        }
+
+        $reverb = config('broadcasting.connections.reverb');
+
+        return [
+            'key' => (string) $reverb['key'],
+            'host' => (string) $reverb['options']['host'],
+            'port' => (int) $reverb['options']['port'],
+            'scheme' => (string) $reverb['options']['scheme'],
+            'channel' => ConsentsChanged::CHANNEL,
+            'event' => ConsentsChanged::NAME,
+        ];
     }
 
     /**

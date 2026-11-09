@@ -3,10 +3,12 @@ import type { ReactNode } from 'react';
 type Props = {
     title: string;
     description?: string;
+    /** A small badge beside the title, such as whether the page is live. */
+    status?: ReactNode;
     actions?: ReactNode;
 };
 
-export function PageHeader({ title, description, actions }: Props) {
+export function PageHeader({ title, description, status, actions }: Props) {
     return (
         <div
             className={
@@ -16,9 +18,12 @@ export function PageHeader({ title, description, actions }: Props) {
             }
         >
             <div className="min-w-0 space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    {title}
-                </h1>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {title}
+                    </h1>
+                    {status}
+                </div>
                 {description && (
                     <p className="max-w-prose text-sm text-pretty text-muted-foreground">
                         {description}

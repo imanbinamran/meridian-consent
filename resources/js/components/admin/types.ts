@@ -87,3 +87,13 @@ export type Paginated<T> = {
     from: number | null;
     to: number | null;
 };
+
+/** Where the browser reaches Reverb. Null when live updates are off. */
+export type RealtimeConfig = {
+    key: string;
+    host: string;
+    port: number;
+    scheme: string;
+    channel: string;
+    event: string;
+};

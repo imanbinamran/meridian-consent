@@ -16,6 +16,7 @@ import {
     percentChange,
     pluralize,
 } from '@/components/admin/format';
+import { LiveIndicator } from '@/components/admin/live-indicator';
 import { PageHeader } from '@/components/admin/page-header';
 import { RecentAcceptances } from '@/components/admin/recent-acceptances';
 import { StatCard } from '@/components/admin/stat-card';
@@ -23,14 +24,17 @@ import type {
     BreakdownBucket,
     DailyPoint,
     OverviewStats,
+    RealtimeConfig,
     RecentConsent,
 } from '@/components/admin/types';
 import { Button } from '@/components/ui/button';
+import { useLiveOverview } from '@/hooks/use-live-overview';
 import { dashboard } from '@/routes';
 import { exportMethod, index as consentsIndex } from '@/routes/admin/consents';
 
 type Props = {
     timezone: string;
+    realtime: RealtimeConfig | null;
     stats: OverviewStats;
     chart: DailyPoint[];
     browsers: BreakdownBucket[];
@@ -40,12 +44,14 @@ type Props = {
 
 export default function Overview({
     timezone,
+    realtime,
     stats,
     chart,
     browsers,
     devices,
     recent,
 }: Props) {
+    const liveStatus = useLiveOverview(realtime);
     const acceptedTrend = percentChange(stats.accepted7d, stats.acceptedPrev7d);
     const declinedTrend = percentChange(stats.declined7d, stats.declinedPrev7d);
 
@@ -57,6 +63,7 @@ export default function Overview({
                 <PageHeader
                     title="Overview"
                     description="How visitors are responding to the consent notice."
+                    status={<LiveIndicator status={liveStatus} />}
                     actions={
                         <>
                             <Button variant="outline" asChild>
