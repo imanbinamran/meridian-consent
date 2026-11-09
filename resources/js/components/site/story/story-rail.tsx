@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, RefObject } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { saveProgress } from './reading-store';
 import type { StorySection } from './types';
 
@@ -60,7 +61,13 @@ export function StoryRail({
     );
     const [crowded, setCrowded] = useState(false);
     const [current, setCurrent] = useState(0);
-    const [left, setLeft] = useState(`${minutes} min left`);
+    // Minutes, or null once finished. Worded at render, so a language switch shows.
+    const [minutesLeft, setMinutesLeft] = useState<number | null>(minutes);
+    const { t } = useI18n();
+    const left =
+        minutesLeft === null
+            ? t('common.story.finished')
+            : t('common.story.min_left', { minutes: minutesLeft });
     const [percent, setPercent] = useState(0);
     const [dragging, setDragging] = useState(false);
     const drag = useRef<{
@@ -215,10 +222,10 @@ export function StoryRail({
             });
 
             setCurrent(section);
-            setLeft(
+            setMinutesLeft(
                 progress >= 0.995
-                    ? 'Finished'
-                    : `${Math.max(1, Math.ceil((1 - progress) * minutes))} min left`,
+                    ? null
+                    : Math.max(1, Math.ceil((1 - progress) * minutes)),
             );
         };
 
@@ -250,7 +257,7 @@ export function StoryRail({
         <nav
             ref={railRef}
             className="story-rail"
-            aria-label="Sections of this story"
+            aria-label={t('common.story.sections_nav')}
             data-crowded={crowded || undefined}
         >
             <div className="story-rail-track" />
@@ -280,8 +287,8 @@ export function StoryRail({
                 className="story-rail-globe"
                 role="slider"
                 tabIndex={0}
-                title="Drag to scroll the story"
-                aria-label="Reading position"
+                title={t('common.story.drag_to_scroll')}
+                aria-label={t('common.story.reading_position')}
                 aria-orientation="vertical"
                 aria-valuemin={0}
                 aria-valuemax={100}

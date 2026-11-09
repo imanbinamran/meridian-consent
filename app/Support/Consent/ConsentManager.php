@@ -11,6 +11,7 @@ use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Database\LostConnectionException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -86,6 +87,7 @@ final class ConsentManager
                 'device_type' => $device->deviceType,
                 'browser_family' => $device->browserFamily,
                 'os_family' => $device->osFamily,
+                'locale' => App::currentLocale(),
             ]);
 
             $this->recordEvent($consent, ConsentEvent::ACCEPTED, $consent->acceptedAt);

@@ -14,12 +14,14 @@ import { StoryFinish } from '@/components/site/story/story-finish';
 import { takeResumePosition } from '@/components/site/story/story-link';
 import { StoryRail } from '@/components/site/story/story-rail';
 import type { Story } from '@/components/site/story/types';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 
 export default function StoryPage({ story }: { story: Story }) {
     const titleRef = useRef<HTMLHeadingElement>(null);
     const storyRef = useRef<HTMLDivElement>(null);
+    const { t } = useI18n();
 
     // Section rules draw across as they arrive. Text never moves.
     useLayoutEffect(() => {
@@ -103,13 +105,17 @@ export default function StoryPage({ story }: { story: Story }) {
                             className="size-4 rtl:-scale-x-100"
                             aria-hidden="true"
                         />
-                        This week&rsquo;s edition
+                        {t('common.story.edition')}
                     </Link>
                     <p className="mt-7 text-xs font-semibold tracking-[0.16em] text-brand uppercase">
                         {story.desk}
-                        <span className="sr-only"> desk</span>
+                        <span className="sr-only">
+                            {t('common.story.desk_suffix')}
+                        </span>
                         <span className="ms-3.5 font-sans font-normal tracking-normal text-muted-foreground normal-case">
-                            {story.minutes} min read
+                            {t('common.story.min_read', {
+                                minutes: story.minutes,
+                            })}
                         </span>
                     </p>
                     <h1
@@ -129,7 +135,7 @@ export default function StoryPage({ story }: { story: Story }) {
                         {story.byline}
                     </p>
                     <p className="mt-2.5 inline-block rounded-full bg-muted px-2.5 py-1 text-xs text-foreground/80">
-                        Sample story. The people and businesses are made up.
+                        {t('common.story.sample_notice')}
                     </p>
                 </header>
 

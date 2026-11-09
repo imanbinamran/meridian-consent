@@ -4,25 +4,44 @@ import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
+import { useI18n } from '@/lib/i18n';
+import type { RichTags } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { privacy, terms } from '@/routes';
+import { LanguageSwitch } from '../language-switch';
 import { useConsent } from './consent-context';
 import type { ConsentChoice } from './consent-context';
 
-const decidedFormat = new Intl.DateTimeFormat('en-MY', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-});
+const agreementLinks: RichTags = {
+    terms: (children) => (
+        <ConsentLink href={terms.url()}>{children}</ConsentLink>
+    ),
+    privacy: (children) => (
+        <ConsentLink href={privacy.url()}>{children}</ConsentLink>
+    ),
+};
+
+const statusTags: RichTags = {
+    strong: (children) => (
+        <strong className="font-medium text-foreground">{children}</strong>
+    ),
+};
 
 /**
  * The cookie notice. A modal the visitor cannot dismiss on a first visit:
  * Esc and outside clicks do nothing, focus stays inside, and the page behind
  * is inert until they choose. Reopened from "Cookie settings", Esc closes it.
+ * The page's language switch is inert too, so the box carries its own.
  */
 export function ConsentDialog() {
     const { consent, open, dismissible, pending, choose, close } = useConsent();
     const contentRef = useRef<HTMLDivElement>(null);
+    const { t, rich, intlLocale } = useI18n();
+    const decidedFormat = new Intl.DateTimeFormat(intlLocale, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
 
     return (
         <AlertDialogPrimitive.Root
@@ -65,48 +84,41 @@ export function ConsentDialog() {
                         >
                             <Cookie className="size-5" />
                         </span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase">
-                                Your privacy
+                                {t('common.consent.kicker')}
                             </p>
                             <AlertDialogPrimitive.Title className="mt-1 font-display text-2xl leading-tight font-medium tracking-tight sm:text-[1.75rem]">
-                                Cookie consent
+                                {t('common.consent.title')}
                             </AlertDialogPrimitive.Title>
                         </div>
+                        <LanguageSwitch />
                     </div>
 
                     <AlertDialogPrimitive.Description asChild>
                         <div className="mt-4 space-y-3 text-[0.95rem] leading-relaxed text-muted-foreground">
+                            <p>{t('common.consent.intro')}</p>
                             <p>
-                                Cookies are necessary for this website to
-                                function properly, for performance measurement,
-                                and to provide you with the best experience.
-                            </p>
-                            <p>
-                                By continuing to access or use this site, you
-                                acknowledge and consent to our use of cookies in
-                                accordance with our{' '}
-                                <ConsentLink href={terms.url()}>
-                                    Terms &amp; Conditions
-                                </ConsentLink>{' '}
-                                and{' '}
-                                <ConsentLink href={privacy.url()}>
-                                    Privacy Statement
-                                </ConsentLink>
-                                .
+                                {rich(
+                                    'common.consent.agreement',
+                                    {},
+                                    agreementLinks,
+                                )}
                             </p>
                         </div>
                     </AlertDialogPrimitive.Description>
 
                     {dismissible && consent.choice && consent.decidedAt && (
                         <p className="mt-4 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
-                            You{' '}
-                            <strong className="font-medium text-foreground">
-                                {consent.choice}
-                            </strong>{' '}
-                            on{' '}
-                            {decidedFormat.format(new Date(consent.decidedAt))}.
-                            Choose again to change it.
+                            {rich(
+                                `common.consent.status_${consent.choice}`,
+                                {
+                                    date: decidedFormat.format(
+                                        new Date(consent.decidedAt),
+                                    ),
+                                },
+                                statusTags,
+                            )}
                         </p>
                     )}
 
@@ -116,14 +128,14 @@ export function ConsentDialog() {
                             pending={pending}
                             onChoose={choose}
                         >
-                            Decline
+                            {t('common.consent.decline')}
                         </ChoiceButton>
                         <ChoiceButton
                             choice="accepted"
                             pending={pending}
                             onChoose={choose}
                         >
-                            Accept
+                            {t('common.consent.accept')}
                         </ChoiceButton>
                     </div>
                 </AlertDialogPrimitive.Content>

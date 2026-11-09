@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Support\Consent\ConsentManager;
 use App\Support\Consent\Timestamp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -17,6 +18,9 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    /** Route names whose page has its own group in lang/{locale}/site.php. */
+    private const PAGES_WITH_OWN_TEXT = ['home', 'about', 'privacy', 'terms'];
 
     /**
      * Determines the current asset version.
@@ -46,7 +50,31 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             // Resolved at render time, after route middleware has marked public pages.
             'consent' => fn (): array => $this->consent($request),
+            'locale' => fn (): string => App::currentLocale(),
+            'translations' => fn (): array => $this->translations($request),
         ];
+    }
+
+    /**
+     * The words for this public page: the shared text plus its own group from
+     * lang/{locale}/site.php. Admin and sign-in pages get none.
+     *
+     * @return array<string, mixed>
+     */
+    private function translations(Request $request): array
+    {
+        if (! $request->attributes->getBoolean(ShowConsentNotice::ATTRIBUTE)) {
+            return [];
+        }
+
+        $groups = ['common'];
+        $page = $request->route()?->getName();
+
+        if (in_array($page, self::PAGES_WITH_OWN_TEXT, true)) {
+            $groups[] = $page;
+        }
+
+        return collect($groups)->mapWithKeys(fn (string $group): array => [$group => __("site.{$group}")])->all();
     }
 
     /**
