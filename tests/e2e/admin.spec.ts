@@ -1,14 +1,20 @@
 import { readFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import {
     ADMIN_STORAGE_STATE,
+    VISITOR_DEVICE,
     acceptAsNewVisitor,
+    chooseStatus,
     consentsTable,
     dataRows,
     logInAsAdmin,
     searchGuid,
 } from './support/admin';
-import { consentDialog } from './support/consent';
+import { consentDialog, settleAnimations } from './support/consent';
+
+const CSV_HEADER =
+    'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family';
 
 /** Admin portal. Case ids refer to tests/cases/admin.yaml. */
 
@@ -38,6 +44,19 @@ test.describe('as a guest', () => {
 
         await page.reload();
         await expect(page).toHaveURL(/\/admin\/?$/);
+    });
+
+    test('ADM-046 a signed-out visitor cannot open a record', async ({
+        page,
+        browser,
+        baseURL,
+    }) => {
+        const guid = await acceptAsNewVisitor(browser, baseURL);
+
+        await page.goto(`/admin/consents/${guid}`);
+
+        await expect(page).toHaveURL(/\/login$/);
+        await expect(page.locator('body')).not.toContainText(guid);
     });
 
     test('ADM-032 no consent box on the login page', async ({ page }) => {
@@ -131,10 +150,267 @@ test.describe('as the admin', () => {
         const csv = await readFile(await download.path(), 'utf8');
         const lines = csv.replace(/^﻿/, '').trim().split(/\r?\n/);
 
-        expect(lines[0]).toBe(
-            'guid,version,accepted_at_utc,status,withdrawn_at,device_type,browser_family,os_family',
-        );
+        expect(lines[0]).toBe(CSV_HEADER);
         expect(lines).toHaveLength(2);
         expect(lines[1].startsWith(`${guid},`)).toBe(true);
     });
+
+    test('ADM-041 a row shows its status and device', async ({
+        page,
+        browser,
+        baseURL,
+    }) => {
+        const active = await acceptAsNewVisitor(browser, baseURL);
+        const withdrawn = await acceptAsNewVisitor(browser, baseURL, {
+            withdraw: true,
+        });
+
+        await page.goto('/admin/consents');
+        const table = consentsTable(page);
+        for (const header of ['Status', 'Device']) {
+            await expect(
+                table.getByRole('columnheader', { name: header, exact: true }),
+            ).toBeVisible();
+        }
+
+        await searchGuid(page, active);
+        await expect(dataRows(table)).toHaveCount(1);
+        await expect(dataRows(table).first()).toContainText('Active');
+        await expect(dataRows(table).first()).toContainText(VISITOR_DEVICE);
+
+        await searchGuid(page, withdrawn);
+        await expect(dataRows(table).first()).toContainText(withdrawn);
+        await expect(dataRows(table).first()).toContainText('Withdrawn');
+    });
+
+    test('ADM-043 the status filter narrows the table and stays in the URL and paging', async ({
+        page,
+        browser,
+        baseURL,
+    }) => {
+        const withdrawn = await acceptAsNewVisitor(browser, baseURL, {
+            withdraw: true,
+        });
+
+        await page.goto('/admin/consents');
+        const table = consentsTable(page);
+        await searchGuid(page, withdrawn);
+        await expect(dataRows(table)).toHaveCount(1);
+
+        await chooseStatus(page, 'Active');
+        await expect(page).toHaveURL(/status=active/);
+        await expect(page.getByText('No consents match')).toBeVisible();
+
+        await chooseStatus(page, 'Withdrawn');
+        await expect(page).toHaveURL(/status=withdrawn/);
+        await expect(dataRows(table)).toHaveCount(1);
+
+        await page.reload();
+        await expect(page.getByRole('combobox', { name: 'Status' })).toHaveText(
+            'Withdrawn',
+        );
+        await expect(dataRows(table)).toHaveCount(1);
+
+        await page.goto('/admin/consents?status=active');
+        await page.getByRole('link', { name: 'Page 2', exact: true }).click();
+        await expect(page).toHaveURL(/status=active/);
+        await expect(page).toHaveURL(/page=2/);
+        await expect(table).not.toContainText('Withdrawn');
+
+        await page.getByRole('button', { name: 'Clear filters' }).click();
+        await expect(page).not.toHaveURL(/status=/);
+    });
+
+    test.describe('in a browser far from Malaysia', () => {
+        test.use({ timezoneId: 'America/New_York' });
+
+        test('ADM-045 the record opens from the keyboard and shows its history in Malaysia time', async ({
+            page,
+            browser,
+            baseURL,
+        }) => {
+            const guid = await acceptAsNewVisitor(browser, baseURL, {
+                withdraw: true,
+            });
+
+            await page.goto('/admin/consents');
+            await searchGuid(page, guid);
+            const link = dataRows(consentsTable(page))
+                .first()
+                .getByRole('link', { name: `View record ${guid}` });
+            await link.focus();
+            await page.keyboard.press('Enter');
+
+            await expect(page).toHaveURL(
+                new RegExp(`/admin/consents/${guid}\\?search=${guid}$`),
+            );
+            await expect(
+                page.getByRole('heading', { name: 'Consent record' }),
+            ).toBeVisible();
+
+            const detail = (term: string) =>
+                page
+                    .locator('dt', { hasText: new RegExp(`^${term}$`) })
+                    .locator('+ dd');
+            await expect(detail('GUID')).toContainText(guid);
+            await expect(detail('Status')).toHaveText('Withdrawn');
+            await expect(detail('Version')).toHaveText('v1');
+            await expect(detail('Device')).toHaveText('Desktop');
+            await expect(detail('Browser')).toHaveText('Chrome');
+            await expect(detail('Operating system')).toHaveText('Windows');
+
+            const events = page.getByRole('listitem').filter({
+                has: page.locator('time'),
+            });
+            await expect(events).toHaveCount(2);
+            await expect(events.nth(0)).toContainText('Accepted');
+            await expect(events.nth(1)).toContainText('Withdrawn');
+
+            const time = events.nth(0).locator('time');
+            const iso = (await time.getAttribute('datetime')) as string;
+            const malaysiaTime = await page.evaluate(
+                (value) =>
+                    new Intl.DateTimeFormat('en-MY', {
+                        timeZone: 'Asia/Kuala_Lumpur',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                    }).format(new Date(value)),
+                iso,
+            );
+            await expect(time).toHaveText(malaysiaTime);
+
+            await page
+                .getByRole('main')
+                .getByRole('link', { name: 'Back to consents' })
+                .click();
+            await expect(page).toHaveURL(new RegExp(`search=${guid}`));
+            await expect(dataRows(consentsTable(page))).toHaveCount(1);
+        });
+    });
+
+    test('ADM-048 the CSV adds status and device columns and honours the status filter', async ({
+        page,
+        browser,
+        baseURL,
+    }) => {
+        const guid = await acceptAsNewVisitor(browser, baseURL, {
+            withdraw: true,
+        });
+
+        await page.goto('/admin/consents?status=withdrawn');
+        await searchGuid(page, guid);
+        await expect(dataRows(consentsTable(page))).toHaveCount(1);
+
+        const downloadPromise = page.waitForEvent('download');
+        await page.getByRole('link', { name: 'Export CSV' }).click();
+        const download = await downloadPromise;
+
+        const lines = (await readFile(await download.path(), 'utf8'))
+            .trim()
+            .split(/\r?\n/);
+
+        expect(lines[0]).toBe(CSV_HEADER);
+        expect(lines).toHaveLength(2);
+        expect(lines[1]).toMatch(
+            new RegExp(
+                `^${guid},1,[^,]+Z,withdrawn,[^,]+Z,Desktop,Chrome,Windows$`,
+            ),
+        );
+    });
+
+    test('ADM-049 the overview shows withdrawals and labelled device breakdowns', async ({
+        page,
+    }) => {
+        await page.goto('/admin');
+
+        await expect(page.getByText('Withdrawn, 30 days')).toBeVisible();
+
+        const section = page.getByRole('region', {
+            name: 'Accepted visitors only',
+        });
+        await expect(section).toContainText('Declines are anonymous');
+
+        const percentages = await section
+            .getByRole('list')
+            .evaluateAll((lists) =>
+                lists.map((list) => ({
+                    labels: Array.from(list.children).map((item) =>
+                        item.querySelector('span')?.textContent?.trim(),
+                    ),
+                    total: Array.from(
+                        list.textContent?.matchAll(/([\d.]+)%/g) ?? [],
+                    ).reduce((sum, match) => sum + Number(match[1]), 0),
+                })),
+            );
+
+        expect(percentages).toHaveLength(2);
+        for (const { labels, total } of percentages) {
+            expect(labels).toContain('Unknown');
+            expect(total).toBeCloseTo(100, 5);
+        }
+    });
+
+    for (const colorScheme of ['light', 'dark'] as const) {
+        for (const [label, width] of [
+            ['320px', 320],
+            ['desktop', 1280],
+        ] as const) {
+            test(`ADM-053 admin pages at ${label} in ${colorScheme} mode fit the screen and pass axe`, async ({
+                page,
+                browser,
+                baseURL,
+            }) => {
+                const guid = await acceptAsNewVisitor(browser, baseURL, {
+                    withdraw: true,
+                });
+
+                await page.emulateMedia({ colorScheme });
+                await page.setViewportSize({ width, height: 800 });
+
+                for (const path of [
+                    '/admin',
+                    '/admin/consents',
+                    `/admin/consents/${guid}`,
+                ]) {
+                    await page.goto(path);
+                    await expect(
+                        page.getByRole('heading', { level: 1 }).first(),
+                    ).toBeVisible();
+                    await page.waitForLoadState('networkidle');
+                    await settleAnimations(page);
+
+                    const { scrollWidth, innerWidth } = await page.evaluate(
+                        () => ({
+                            scrollWidth:
+                                document.scrollingElement?.scrollWidth ?? 0,
+                            innerWidth: window.innerWidth,
+                        }),
+                    );
+                    expect(scrollWidth, path).toBeLessThanOrEqual(innerWidth);
+
+                    const results = await new AxeBuilder({ page })
+                        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+                        .analyze();
+                    expect(
+                        results.violations
+                            .filter((violation) =>
+                                ['serious', 'critical'].includes(
+                                    violation.impact ?? '',
+                                ),
+                            )
+                            .map((violation) => ({
+                                id: violation.id,
+                                targets: violation.nodes
+                                    .map((node) => node.target.join(' '))
+                                    .slice(0, 5),
+                            })),
+                        path,
+                    ).toEqual([]);
+                }
+            });
+        }
+    }
 });
