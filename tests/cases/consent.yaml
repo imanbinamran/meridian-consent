@@ -124,6 +124,10 @@ requirements:
       text: 'If the consents lookup throws a database error, a format-valid cookie counts as valid for that request and a warning is logged'
       anchor: 'S3 app/Support/Consent/ConsentManager.php, outage handling'
       risk: { impact: 2, likelihood: 1 }
+    - id: REQ-25
+      text: 'Both consent cookies are HttpOnly and stay unencrypted, so page scripts cannot read them but a visitor can in DevTools'
+      anchor: 'S3 app/Support/Consent/ConsentManager.php makeCookie'
+      risk: { impact: 2, likelihood: 2 }
 
 scope:
     in:
@@ -1315,3 +1319,28 @@ cases:
             }
       cleanup: 'Rolled back by RefreshDatabase'
       tags: [pest]
+
+    - id: CON-079
+      title: Both consent cookies are HttpOnly
+      type: web
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-25]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Click Accept and read the consent cookie
+          - In a new context click Decline and read the consent_declined cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: HttpOnly set,
+                expected: 'Both cookies have HttpOnly true and hold their plain, unencrypted value',
+                provenance: REQ-25,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [pest, e2e]

@@ -160,6 +160,7 @@ export async function addAcceptedCookie(
             value: encodeURIComponent(value),
             url: baseURL,
             expires: Math.floor(Date.now() / 1000) + expiresInSeconds,
+            httpOnly: true,
             sameSite: 'Lax',
         },
     ]);

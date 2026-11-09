@@ -177,6 +177,7 @@ test.describe('accept', () => {
         await expect(dialog).toBeHidden();
 
         const cookie = await waitForCookie(context, ACCEPTED_COOKIE);
+        expect(cookie.httpOnly).toBe(true);
         const value = parseAcceptedCookie(cookie);
 
         expect(Object.keys(value).sort()).toEqual([
@@ -394,6 +395,7 @@ test.describe('decline', () => {
         const before = Date.now();
         const cookie = await declineConsent(page);
 
+        expect(cookie.httpOnly).toBe(true);
         const value = decodeCookieValue(cookie.value);
         expect(value).toMatch(ISO_UTC);
         expect(Math.abs(Date.parse(value) - before)).toBeLessThan(

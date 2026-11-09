@@ -17,9 +17,9 @@ use Symfony\Component\HttpFoundation\Cookie;
 /**
  * Reads and records a visitor's cookie choice.
  *
- * Both cookies are written by the server only, are left unencrypted (see
- * bootstrap/app.php) so their values can be read in the browser, and are
- * validated on every request: a bad value counts as no choice at all. An
+ * Both cookies are written by the server only, are HttpOnly so page scripts
+ * cannot read them, are left unencrypted (see bootstrap/app.php) so a visitor
+ * can read their values in DevTools, and are validated on every request: a bad value counts as no choice at all. An
  * accepted cookie must also match its row in the consents table, because
  * anyone can type a well-formed cookie by hand.
  */
@@ -207,7 +207,7 @@ final class ConsentManager
             path: (string) $this->config->get('session.path', '/'),
             domain: $this->config->get('session.domain'),
             secure: $request->isSecure(),
-            httpOnly: false,
+            httpOnly: true,
             raw: false,
             sameSite: Cookie::SAMESITE_LAX,
         );

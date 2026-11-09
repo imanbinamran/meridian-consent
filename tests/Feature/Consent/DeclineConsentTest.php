@@ -25,6 +25,11 @@ it('sets consent_declined to the UTC decline time, expiring after 1 day', functi
         ->and($cookie->getSameSite())->toBe('lax');
 });
 
+// CON-079
+it('sets the decline cookie HttpOnly', function () {
+    expect(consentCookie($this->post(route('consent.decline')), 'consent_declined')->isHttpOnly())->toBeTrue();
+});
+
 // CON-053
 it('counts one anonymous decline and stores no consent', function () {
     $this->post(route('consent.decline'));
