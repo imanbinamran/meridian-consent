@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Consent;
 use App\Models\ConsentDecline;
+use App\Models\ConsentEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ use Illuminate\Support\Str;
  *   future (server clock skew), just now, no created_at, an upper-case
  *   GUID from an import, and a date-style version number (2026110801).
  * - One row a year old, so "oldest first" shows an absolute date.
+ * - 1 in 20 acceptances withdrawn, and an audit trail for every consent.
  * - One decline, a month ago: singular copy, a 7-day count of 0 and no
  *   trend to compare against.
  */
@@ -40,8 +42,12 @@ class WorstCaseConsentSeeder extends Seeder
             ['guid' => (string) Str::uuid(), 'version' => 2, 'accepted_at' => $now->subYear(), 'created_at' => $now->subYear()],
         ];
 
-        foreach ($edgeCases as $row) {
-            Consent::query()->insert([...$row, 'updated_at' => $row['created_at']]);
+        foreach ($edgeCases as $index => $row) {
+            // The year-old row is the withdrawn edge case.
+            $withdrawnAt = $index === 4 ? $row['accepted_at']->addDay() : null;
+
+            Consent::query()->insert([...$row, 'withdrawn_at' => $withdrawnAt, 'updated_at' => $row['created_at']]);
+            ConsentEvent::query()->insert($this->events($row['guid'], $row['version'], $row['accepted_at'], $withdrawnAt));
         }
 
         $start = $now->subDays(29)->startOfDay()->getTimestamp();
@@ -49,15 +55,36 @@ class WorstCaseConsentSeeder extends Seeder
 
         for ($offset = 0; $offset < self::BULK_ROWS; $offset += 1000) {
             $rows = [];
+            $events = [];
 
             for ($i = 0; $i < 1000; $i++) {
-                $at = CarbonImmutable::createFromTimestampUTC($start + random_int(0, $span))->format('Y-m-d H:i:s');
-                $rows[] = ['guid' => (string) Str::uuid(), 'version' => 1, 'accepted_at' => $at, 'created_at' => $at, 'updated_at' => $at];
+                $acceptedAt = CarbonImmutable::createFromTimestampUTC($start + random_int(0, $span));
+                $at = $acceptedAt->format('Y-m-d H:i:s');
+                $guid = (string) Str::uuid();
+                $withdrawnAt = random_int(1, 20) === 1 ? min($acceptedAt->addHours(random_int(1, 48)), $now) : null;
+
+                $rows[] = ['guid' => $guid, 'version' => 1, 'accepted_at' => $at, 'withdrawn_at' => $withdrawnAt?->format('Y-m-d H:i:s'), 'created_at' => $at, 'updated_at' => $at];
+                array_push($events, ...$this->events($guid, 1, $acceptedAt, $withdrawnAt));
             }
 
             Consent::query()->insert($rows);
+            ConsentEvent::query()->insert($events);
         }
 
         ConsentDecline::query()->insert(['version' => 1, 'declined_at' => $now->subDays(25)]);
+    }
+
+    /**
+     * @return list<array{guid: string, type: string, version: int, occurred_at: string}>
+     */
+    private function events(string $guid, int $version, CarbonImmutable $acceptedAt, ?CarbonImmutable $withdrawnAt): array
+    {
+        $events = [['guid' => $guid, 'type' => ConsentEvent::ACCEPTED, 'version' => $version, 'occurred_at' => $acceptedAt->format('Y-m-d H:i:s')]];
+
+        if ($withdrawnAt !== null) {
+            $events[] = ['guid' => $guid, 'type' => ConsentEvent::WITHDRAWN, 'version' => $version, 'occurred_at' => $withdrawnAt->format('Y-m-d H:i:s')];
+        }
+
+        return $events;
     }
 }

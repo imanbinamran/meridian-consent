@@ -36,6 +36,18 @@ CREATE TABLE `consent_declines` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `consent_events` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `guid` char(36) NOT NULL,
+  `type` varchar(16) NOT NULL,
+  `version` smallint(5) unsigned NOT NULL,
+  `occurred_at` timestamp NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `consent_events_guid_index` (`guid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `consents` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `guid` char(36) NOT NULL,
@@ -43,6 +55,7 @@ CREATE TABLE `consents` (
   `accepted_at` timestamp NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `withdrawn_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `consents_guid_unique` (`guid`),
   KEY `consents_accepted_at_index` (`accepted_at`)

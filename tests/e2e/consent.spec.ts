@@ -459,6 +459,39 @@ test.describe('decline', () => {
     });
 });
 
+test.describe('withdrawing consent', () => {
+    test('CON-083 a cookie replayed after withdrawing brings the box back', async ({
+        page,
+        context,
+        baseURL,
+    }) => {
+        await page.goto('/');
+        await acceptConsent(page);
+        const accepted = await waitForCookie(context, ACCEPTED_COOKIE);
+        await waitForPublicPage(page);
+
+        await page
+            .getByRole('contentinfo')
+            .getByRole('button', { name: 'Cookie settings' })
+            .click();
+        await declineConsent(page);
+        await expect
+            .poll(() => getCookie(context, ACCEPTED_COOKIE))
+            .toBeUndefined();
+
+        await context.clearCookies({ name: DECLINED_COOKIE });
+        await addAcceptedCookie(
+            context,
+            baseURL as string,
+            decodeCookieValue(accepted.value),
+            30 * DAY_SECONDS,
+        );
+
+        await page.reload();
+        await expectConsentBox(page);
+    });
+});
+
 test.describe('cookie settings', () => {
     test('CON-060 footer Cookie settings reopens the box after a choice', async ({
         page,

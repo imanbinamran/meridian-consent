@@ -4,12 +4,14 @@ namespace App\Support\Consent;
 
 use App\Models\Consent;
 use App\Models\ConsentDecline;
+use App\Models\ConsentEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Database\LostConnectionException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PDOException;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -56,6 +58,7 @@ final class ConsentManager
      * Record an acceptance. A visitor who already holds a verified cookie
      * keeps its GUID and time, so a double click or a retry never adds a row.
      * Everything stored here is made by the server, never read from a cookie.
+     * The row and its accepted event are written together or not at all.
      */
     public function accept(Request $request): AcceptedConsent
     {
@@ -67,28 +70,40 @@ final class ConsentManager
 
         $consent = AcceptedConsent::issue($this->now(), $this->version());
 
-        Consent::query()->create([
-            'guid' => $consent->guid,
-            'version' => $consent->version,
-            'accepted_at' => $consent->acceptedAt,
-        ]);
+        DB::transaction(function () use ($consent): void {
+            Consent::query()->create([
+                'guid' => $consent->guid,
+                'version' => $consent->version,
+                'accepted_at' => $consent->acceptedAt,
+            ]);
+
+            $this->recordEvent($consent, ConsentEvent::ACCEPTED, $consent->acceptedAt);
+        });
 
         return $consent;
     }
 
     /**
-     * Record a decline. Declines are counted, never identified. A visitor who
-     * already declined within the last day is not counted twice.
+     * Record a decline. A visitor holding a verified cookie is withdrawing a
+     * consent we can point to, so that record is marked and the trail extended.
+     * Anyone else is counted, never identified, and a visitor who already
+     * declined within the last day is not counted twice.
      */
     public function decline(Request $request): CarbonImmutable
     {
-        $existing = $this->declinedAt($request, $this->now());
+        $now = $this->now();
+        $declinedAt = $now->startOfSecond();
+        $cookie = $this->acceptedFromCookie($request, $now);
+
+        if ($cookie !== null && $this->withdraw($cookie, $declinedAt)) {
+            return $this->declinedAt($request, $now) ?? $declinedAt;
+        }
+
+        $existing = $this->declinedAt($request, $now);
 
         if ($existing !== null) {
             return $existing;
         }
-
-        $declinedAt = $this->now()->startOfSecond();
 
         ConsentDecline::query()->create([
             'version' => $this->version(),
@@ -168,12 +183,46 @@ final class ConsentManager
     }
 
     /**
-     * The row this cookie claims to be, or null if there is none or it
-     * disagrees on the time (to the second) or the version.
+     * Mark the cookie's record withdrawn and add the withdrawn event, together
+     * or not at all. Returns false when the cookie matches no live record.
      */
-    private function matchingRecord(AcceptedConsent $cookie): ?Consent
+    private function withdraw(AcceptedConsent $cookie, CarbonImmutable $at): bool
     {
-        $record = Consent::query()->where('guid', $cookie->guid)->first();
+        return DB::transaction(function () use ($cookie, $at): bool {
+            $record = $this->matchingRecord($cookie, lock: true);
+
+            if ($record === null) {
+                return false;
+            }
+
+            $record->update(['withdrawn_at' => $at]);
+            $this->recordEvent(AcceptedConsent::fromRecord($record), ConsentEvent::WITHDRAWN, $at);
+
+            return true;
+        });
+    }
+
+    private function recordEvent(AcceptedConsent $consent, string $type, CarbonImmutable $at): void
+    {
+        ConsentEvent::query()->create([
+            'guid' => $consent->guid,
+            'type' => $type,
+            'version' => $consent->version,
+            'occurred_at' => $at,
+        ]);
+    }
+
+    /**
+     * The live row this cookie claims to be, or null if there is none, it was
+     * withdrawn, or it disagrees on the time (to the second) or the version.
+     */
+    private function matchingRecord(AcceptedConsent $cookie, bool $lock = false): ?Consent
+    {
+        $record = Consent::query()
+            ->where('guid', $cookie->guid)
+            ->whereNull('withdrawn_at')
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->first();
 
         if ($record === null
             || $record->version !== $cookie->version
