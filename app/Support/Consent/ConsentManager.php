@@ -2,6 +2,7 @@
 
 namespace App\Support\Consent;
 
+use App\Events\ConsentsChanged;
 use App\Models\Consent;
 use App\Models\ConsentDecline;
 use App\Models\ConsentEvent;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PDOException;
 use Symfony\Component\HttpFoundation\Cookie;
+use Throwable;
 
 /**
  * Reads and records a visitor's cookie choice.
@@ -89,6 +91,8 @@ final class ConsentManager
             $this->recordEvent($consent, ConsentEvent::ACCEPTED, $consent->acceptedAt);
         });
 
+        $this->announceChange();
+
         return $consent;
     }
 
@@ -120,6 +124,8 @@ final class ConsentManager
             'version' => $this->version(),
             'declined_at' => $declinedAt,
         ]);
+
+        $this->announceChange();
 
         return $declinedAt;
     }
@@ -197,11 +203,14 @@ final class ConsentManager
      * Mark the cookie's record withdrawn and add the withdrawn event, together
      * or not at all. Returns true when the GUID is a consent already dealt
      * with here, so the caller adds no anonymous decline for it, and false
-     * when the cookie matches no record.
+     * when the cookie matches no record. Only a row that really changed is
+     * announced, so withdrawing twice stays quiet.
      */
     private function withdraw(AcceptedConsent $cookie, CarbonImmutable $at): bool
     {
-        return DB::transaction(function () use ($cookie, $at): bool {
+        $marked = false;
+
+        $handled = DB::transaction(function () use ($cookie, $at, &$marked): bool {
             $record = Consent::query()->where('guid', $cookie->guid)->lockForUpdate()->first();
 
             if ($record === null) {
@@ -218,9 +227,32 @@ final class ConsentManager
 
             $record->update(['withdrawn_at' => $at]);
             $this->recordEvent(AcceptedConsent::fromRecord($record), ConsentEvent::WITHDRAWN, $at);
+            $marked = true;
 
             return true;
         });
+
+        if ($marked) {
+            $this->announceChange();
+        }
+
+        return $handled;
+    }
+
+    /**
+     * Tell the admin overview something changed. The choice is already saved
+     * by now, and live numbers are a nicety, so no failure here may reach the
+     * visitor.
+     */
+    private function announceChange(): void
+    {
+        try {
+            ConsentsChanged::dispatch();
+        } catch (Throwable $exception) {
+            Log::warning('The admin overview could not be told about a consent change.', [
+                'exception' => $exception::class,
+            ]);
+        }
     }
 
     private function recordEvent(AcceptedConsent $consent, string $type, CarbonImmutable $at): void
