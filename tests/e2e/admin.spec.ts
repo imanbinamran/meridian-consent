@@ -380,11 +380,36 @@ test.describe('as the admin', () => {
                 })),
             );
 
-        expect(percentages).toHaveLength(2);
+        expect(percentages).toHaveLength(3);
         for (const { labels, total } of percentages) {
             expect(labels).toContain('Unknown');
             expect(total).toBeCloseTo(100, 5);
         }
+    });
+
+    test('ADM-070 the overview fits a 1280 by 720 laptop with five cards in one row', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto('/admin');
+        await expect(
+            page.getByRole('img', { name: /Weekly accept rate/ }),
+        ).toBeVisible();
+
+        const layout = await page.evaluate(() => ({
+            page: document.scrollingElement!.scrollHeight,
+            screen: window.innerHeight,
+            cardTops: Array.from(
+                document.querySelectorAll(
+                    'section[aria-label="Key numbers"] > *',
+                ),
+                (card) => card.getBoundingClientRect().top,
+            ),
+        }));
+
+        expect(layout.page).toBeLessThanOrEqual(layout.screen);
+        expect(layout.cardTops).toHaveLength(5);
+        expect(new Set(layout.cardTops).size).toBe(1);
     });
 
     for (const width of [375, 320] as const) {
@@ -392,6 +417,38 @@ test.describe('as the admin', () => {
             test.use({ viewport: { width, height: 812 }, hasTouch: true });
 
             const { guid } = EXPIRED_CONSENT;
+
+            test('ADM-071 the overview fits the phone and its details open on tap', async ({
+                page,
+            }) => {
+                await page.goto('/admin');
+
+                await page.getByRole('button', { name: /^Browser/ }).tap();
+                await expect(
+                    page.locator('[data-slot=popover-content]'),
+                ).toContainText('Chrome');
+                await page.touchscreen.tap(2, 2);
+
+                const chart = page.getByRole('img', {
+                    name: /Weekly accept rate/,
+                });
+                await chart.scrollIntoViewIfNeeded();
+                const box = (await chart.boundingBox())!;
+                await page.touchscreen.tap(
+                    box.x + box.width * 0.92,
+                    box.y + box.height * 0.4,
+                );
+                await expect(
+                    chart.locator('.recharts-tooltip-wrapper'),
+                ).toContainText('Declined');
+
+                const overflow = await page.evaluate(
+                    () =>
+                        document.scrollingElement!.scrollWidth -
+                        window.innerWidth,
+                );
+                expect(overflow).toBeLessThanOrEqual(0);
+            });
 
             test('ADM-055 a row shows the whole record without sideways scrolling', async ({
                 page,

@@ -39,11 +39,25 @@ export type BreakdownBucket = {
     percent: number;
 };
 
-export type RecentConsent = {
-    id: number;
-    guid: string;
-    version: number;
-    acceptedAt: string;
+export type WeeklyRate = {
+    /** First and last local day of the 7-day stretch. */
+    start: string;
+    end: string;
+    accepted: number;
+    declined: number;
+    /** Null when nobody responded that week. */
+    rate: number | null;
+};
+
+export type RenewalMonth = {
+    /** "2027-11" */
+    month: string;
+    count: number;
+};
+
+export type Renewals = {
+    next30: number;
+    months: RenewalMonth[];
 };
 
 export type DailyPoint = {

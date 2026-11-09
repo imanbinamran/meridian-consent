@@ -14,7 +14,7 @@ export function PageHeader({ title, description, status, actions }: Props) {
             className={
                 description
                     ? 'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'
-                    : 'flex items-center justify-between gap-3'
+                    : 'flex flex-wrap items-center justify-between gap-3'
             }
         >
             <div className="min-w-0 space-y-1">

@@ -18,7 +18,7 @@ function refetchOverview(done: () => void): () => void {
     let cancel: (() => void) | undefined;
 
     router.reload({
-        only: ['stats', 'chart', 'recent'],
+        only: ['stats', 'chart', 'health', 'acceptRate', 'renewals'],
         showProgress: false,
         onCancelToken: (token) => {
             cancel = token.cancel;
