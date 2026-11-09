@@ -40,3 +40,21 @@ it('thanks the sender of a valid contact message', function () {
         ->assertRedirect(route('about'))
         ->assertSessionHasNoErrors();
 });
+
+it('writes link preview tags into the first response', function () {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('<meta property="og:title" content="Meridian">', false)
+        ->assertSee('<meta property="og:type" content="website">', false)
+        ->assertSee('<meta property="og:image" content="'.asset('og.png').'">', false)
+        ->assertSee('<meta name="twitter:card" content="summary_large_image">', false);
+
+    expect(public_path('og.png'))->toBeFile();
+});
+
+it('gives a story its own title and type in the link preview', function () {
+    $this->get(route('stories.show', 'the-quiet-return-of-the-neighbourhood-kopitiam'))
+        ->assertOk()
+        ->assertSee('<meta property="og:type" content="article">', false)
+        ->assertSee(' · Meridian">', false);
+});
