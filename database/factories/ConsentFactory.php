@@ -25,6 +25,7 @@ class ConsentFactory extends Factory
             'device_type' => fake()->randomElement(DeviceProfile::DEVICE_TYPES),
             'browser_family' => fake()->randomElement(DeviceProfile::BROWSER_FAMILIES),
             'os_family' => fake()->randomElement(DeviceProfile::OS_FAMILIES),
+            'locale' => 'en',
         ];
     }
 

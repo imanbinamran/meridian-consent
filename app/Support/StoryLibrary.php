@@ -2,15 +2,19 @@
 
 namespace App\Support;
 
+use App\Http\Middleware\HandleLocale;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 
 /**
- * The sample stories, read from one data file. Read time comes from the word
- * count, so what the site promises always matches what was written.
+ * The sample stories, in English and Bahasa Melayu, one data file each. Read
+ * time comes from the word count of the language shown, so what the site
+ * promises always matches what was written.
  *
  * @phpstan-type Block array{type: string, text?: string, title?: string, rows?: list<array{term: string, meaning: string}>}
- * @phpstan-type Section array{name: string, blocks: list<Block>}
+ * @phpstan-type Section array{id?: string, name: string, blocks: list<Block>}
  * @phpstan-type RawStory array{slug: string, desk: string, title: string, deck: string, byline: string, long_read: bool, sections: list<Section>}
+ * @phpstan-type Translation array{slug: string, desk: string, title: string, deck: string, byline: string, sections: list<Section>}
  * @phpstan-type Summary array{slug: string, desk: string, title: string, byline: string, minutes: int}
  */
 class StoryLibrary
@@ -18,7 +22,10 @@ class StoryLibrary
     public const WORDS_PER_MINUTE = 220;
 
     /** @var list<RawStory>|null */
-    private ?array $stories = null;
+    private ?array $english = null;
+
+    /** @var array<string, Translation>|null */
+    private ?array $malay = null;
 
     /**
      * The stories listed in "This week's edition", in order.
@@ -64,7 +71,7 @@ class StoryLibrary
                 ...$this->summary($story),
                 'deck' => $story['deck'],
                 'sections' => array_map(fn (array $section): array => [
-                    'id' => Str::slug($section['name']),
+                    'id' => $section['id'] ?? Str::slug($section['name']),
                     'name' => $section['name'],
                     'blocks' => $section['blocks'],
                 ], $story['sections']),
@@ -100,10 +107,38 @@ class StoryLibrary
      */
     public function all(): array
     {
-        /** @var list<RawStory> $stories */
-        $stories = $this->stories ??= require resource_path('data/stories.php');
+        /** @var list<RawStory> $english */
+        $english = $this->english ??= require resource_path('data/stories.php');
 
-        return $stories;
+        if (App::currentLocale() !== HandleLocale::MALAY) {
+            return $english;
+        }
+
+        return array_map($this->inMalay(...), $english);
+    }
+
+    /**
+     * The story with its words swapped. Section ids stay the English ones, so
+     * a link to a section means the same place in either language.
+     *
+     * @param  RawStory  $story
+     * @return RawStory
+     */
+    private function inMalay(array $story): array
+    {
+        /** @var list<Translation> $translations */
+        $translations = $this->malay === null ? require resource_path('data/stories.ms.php') : [];
+        $this->malay ??= array_column($translations, null, 'slug');
+        $malay = $this->malay[$story['slug']];
+
+        return [
+            ...$malay,
+            'long_read' => $story['long_read'],
+            'sections' => array_map(fn (array $section, array $original): array => [
+                ...$section,
+                'id' => Str::slug($original['name']),
+            ], $malay['sections'], $story['sections']),
+        ];
     }
 
     /**

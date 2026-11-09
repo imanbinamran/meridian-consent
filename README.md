@@ -375,7 +375,7 @@ tests/e2e/                  Playwright
 
 - **Admin roles.** Any verified user is an admin today. That's safe only because registration is off.
 - **Server-side rendering.** The page needs JavaScript to show content. Inertia SSR would make it work without it.
-- **Bahasa Malaysia.** The layout is ready for translation, but the copy is English only.
+- **A reviewed Malay edition.** The EN/BM switch works, but the Malay text is a draft. A fluent reader should check it, the Privacy Policy and Terms first.
 - **A retention period.** Consent records and the decline count are kept with no end date today. I'd set one and prune past it.
 - **Real phones.** Phone checks ran in emulation. I'd confirm safe areas and tap behaviour on a real iPhone and Android.
 

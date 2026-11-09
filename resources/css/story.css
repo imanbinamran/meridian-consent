@@ -19,6 +19,13 @@
     display: inline-block;
 }
 
+/* An inline-block word never gets its parent's underline, so it draws its own. */
+@media (hover: hover) {
+    a:hover .story-word {
+        text-decoration: underline 2px;
+    }
+}
+
 .story-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 40rem) minmax(0, 1fr);
@@ -161,12 +168,44 @@
     background: var(--background);
     color: var(--brand);
     transform: translateY(calc(var(--progress, 0) * var(--story-rail-height)));
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+/* A bigger target than the globe, stopping short of the section names. */
+.story-rail-globe::before {
+    position: absolute;
+    inset: -12px -8px;
+    content: '';
+}
+
+.story-rail-globe:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+
+.story-rail-globe[data-dragging] {
+    cursor: grabbing;
 }
 
 .story-rail-globe svg {
     display: block;
     width: 100%;
     height: 100%;
+    border-radius: 50%;
+    background: var(--background);
+    transition: transform 150ms var(--ease-out-strong);
+}
+
+@media (hover: hover) {
+    .story-rail-globe:hover svg {
+        transform: scale(1.3);
+    }
+}
+
+.story-rail-globe[data-dragging] svg {
+    transform: scale(1.4);
 }
 
 .story-rail-turn {

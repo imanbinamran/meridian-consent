@@ -19,89 +19,14 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useI18n } from '@/lib/i18n';
 import { store } from '@/routes/contact';
 
-const timeline = [
-    {
-        year: '2014',
-        text: 'Three reporters open Meridian in a rented shophouse in Bangsar with one rule: no story goes out unchecked.',
-    },
-    {
-        year: '2017',
-        text: 'The Bahasa Malaysia edition launches, written by its own team rather than translated.',
-    },
-    {
-        year: '2020',
-        text: 'The Meridian Briefing newsletter starts. Five stories, seven minutes, every weekday at 7am.',
-    },
-    {
-        year: '2023',
-        text: 'Lifestyle and Food become full desks, and the newsroom moves to Jalan Ampang.',
-    },
-    {
-        year: '2026',
-        text: 'Our East Malaysia bureau opens in Kota Kinabalu, so Sabah and Sarawak are reported from Sabah and Sarawak.',
-    },
-];
-
-const values = [
-    {
-        title: 'Accuracy first',
-        body: 'Two editors read every story before it is published. Figures are sourced, quotes are recorded and claims are put to the people they concern.',
-    },
-    {
-        title: 'Independence',
-        body: 'No owner, advertiser or political party sees a story before you do. Sponsored content is always labelled and written by a separate team.',
-    },
-    {
-        title: 'Fairness',
-        body: 'We give people a real chance to respond, we avoid sensational language, and we report on communities with the respect we would want ourselves.',
-    },
-    {
-        title: 'Transparency',
-        body: 'Corrections are made within 24 hours and noted at the top of the story. Our editorial code is published and open to challenge.',
-    },
-];
-
-const facts = [
-    { term: 'Founded', detail: '2014, Kuala Lumpur' },
-    { term: 'Newsroom', detail: '38 journalists, editors and producers' },
-    { term: 'Bureaus', detail: 'Kuala Lumpur, Penang and Kota Kinabalu' },
-    { term: 'Languages', detail: 'English and Bahasa Malaysia' },
-    { term: 'Readers', detail: '2.4 million a month' },
-    { term: 'Publisher', detail: 'Meridian Media Sdn. Bhd.' },
-];
-
-const team = [
-    {
-        name: 'Nadia Hassan',
-        role: 'Editor-in-chief',
-        bio: 'Former political correspondent who has covered five general elections.',
-    },
-    {
-        name: 'Kelvin Tan',
-        role: 'Managing editor',
-        bio: 'Runs the daily news meeting and the corrections desk.',
-    },
-    {
-        name: 'Priya Raman',
-        role: 'Head of Lifestyle & Food',
-        bio: 'Food writer and author of a guide to Malaysian breakfast.',
-    },
-    {
-        name: 'Joanna Gimbang',
-        role: 'Bureau chief, East Malaysia',
-        bio: 'Reports on Sabah and Sarawak from Kota Kinabalu.',
-    },
-];
-
-const topics = [
-    { value: 'general', label: 'General enquiry' },
-    { value: 'news-tip', label: 'News tip' },
-    { value: 'correction', label: 'Correction request' },
-    { value: 'advertising', label: 'Advertising and partnerships' },
-    { value: 'careers', label: 'Careers' },
-];
+type TimelineEntry = { year: string; text: string };
+type Fact = { term: string; detail: string };
+type Value = { title: string; body: string };
+type Person = { name: string; role: string; bio: string };
+type Topic = { value: string; label: string };
 
 function initials(name: string): string {
     const words = name.trim().split(/\s+/);
@@ -113,13 +38,18 @@ function initials(name: string): string {
 }
 
 export default function About() {
+    const { t, list } = useI18n();
+    const lines = (key: string) =>
+        list<string>(key).map((line) => (
+            <span key={line} className="block">
+                {line}
+            </span>
+        ));
+
     return (
         <>
-            <Head title="About Us & Contact">
-                <meta
-                    name="description"
-                    content="Meet the Meridian newsroom in Kuala Lumpur: our story, our editorial standards, our team and how to reach us."
-                />
+            <Head title={t('about.title')}>
+                <meta name="description" content={t('about.description')} />
             </Head>
 
             <section
@@ -129,27 +59,20 @@ export default function About() {
                 <MeridianLines className="absolute -end-72 -top-56 size-[52rem] text-foreground/[0.06]" />
                 <div className="relative mx-auto grid max-w-6xl gap-12 px-4 pt-14 pb-16 sm:px-6 sm:pt-20 lg:grid-cols-12 lg:px-8 lg:pt-24 lg:pb-20">
                     <div className="lg:col-span-7">
-                        <Kicker>About Meridian</Kicker>
+                        <Kicker>{t('about.hero.kicker')}</Kicker>
                         <h1
                             id="about-title"
                             className="mt-6 font-display text-[2.6rem] leading-[1.04] font-medium tracking-tight text-balance sm:text-6xl"
                         >
-                            A newsroom built for the long view.
+                            {t('about.hero.title')}
                         </h1>
                     </div>
                     <div className="space-y-5 text-lg leading-relaxed text-muted-foreground lg:col-span-5 lg:pt-16">
-                        <p>
-                            Meridian began in 2014 with three reporters, one
-                            borrowed printer and a belief that Malaysians
-                            deserve journalism that respects their time and
-                            their intelligence.
-                        </p>
-                        <p>
-                            Twelve years on, we are a team of 38 across Kuala
-                            Lumpur, Penang and Kota Kinabalu. We are funded by
-                            readers and responsible advertising, and we answer
-                            to no one but the people who read us.
-                        </p>
+                        {list<string>('about.hero.paragraphs').map(
+                            (paragraph) => (
+                                <p key={paragraph}>{paragraph}</p>
+                            ),
+                        )}
                     </div>
                 </div>
             </section>
@@ -162,27 +85,29 @@ export default function About() {
                 <div className="lg:col-span-7">
                     <SectionHeading
                         id="story-title"
-                        kicker="Our story"
-                        title="Twelve years, one rule."
+                        kicker={t('about.story.kicker')}
+                        title={t('about.story.title')}
                     />
                     <ol className="mt-10 border-s-2 border-foreground/10">
-                        {timeline.map((entry) => (
-                            <li
-                                key={entry.year}
-                                className="relative ps-8 pb-9 last:pb-0"
-                            >
-                                <span
-                                    aria-hidden="true"
-                                    className="absolute -start-[7px] top-1.5 size-3 rounded-full border-2 border-background bg-primary"
-                                />
-                                <p className="font-display text-2xl font-medium text-brand tabular-nums">
-                                    {entry.year}
-                                </p>
-                                <p className="mt-1 max-w-lg leading-relaxed text-muted-foreground">
-                                    {entry.text}
-                                </p>
-                            </li>
-                        ))}
+                        {list<TimelineEntry>('about.story.timeline').map(
+                            (entry) => (
+                                <li
+                                    key={entry.year}
+                                    className="relative ps-8 pb-9 last:pb-0"
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className="absolute -start-[7px] top-1.5 size-3 rounded-full border-2 border-background bg-primary"
+                                    />
+                                    <p className="font-display text-2xl font-medium text-brand tabular-nums">
+                                        {entry.year}
+                                    </p>
+                                    <p className="mt-1 max-w-lg leading-relaxed text-muted-foreground">
+                                        {entry.text}
+                                    </p>
+                                </li>
+                            ),
+                        )}
                     </ol>
                 </div>
 
@@ -194,10 +119,10 @@ export default function About() {
                         id="facts-title"
                         className="font-display text-2xl font-medium"
                     >
-                        The newsroom at a glance
+                        {t('about.facts.title')}
                     </h2>
                     <dl className="mt-6 divide-y divide-foreground/10">
-                        {facts.map((fact) => (
+                        {list<Fact>('about.facts.items').map((fact) => (
                             <div
                                 key={fact.term}
                                 className="grid grid-cols-[7rem_1fr] gap-4 py-3.5 text-sm"
@@ -223,12 +148,12 @@ export default function About() {
                 <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
                     <SectionHeading
                         id="standards-title"
-                        kicker="Editorial standards"
-                        title="What you can hold us to."
-                        description="These are the commitments every Meridian journalist signs. If you think we have fallen short, tell us. A senior editor reviews every complaint."
+                        kicker={t('about.standards.kicker')}
+                        title={t('about.standards.title')}
+                        description={t('about.standards.description')}
                     />
                     <ul className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-foreground/10 bg-foreground/10 sm:grid-cols-2">
-                        {values.map((value) => (
+                        {list<Value>('about.standards.items').map((value) => (
                             <li
                                 key={value.title}
                                 className="bg-background p-7 sm:p-9"
@@ -252,11 +177,11 @@ export default function About() {
             >
                 <SectionHeading
                     id="team-title"
-                    kicker="The people"
-                    title="Who runs the newsroom."
+                    kicker={t('about.team.kicker')}
+                    title={t('about.team.title')}
                 />
                 <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-                    {team.map((person) => (
+                    {list<Person>('about.team.items').map((person) => (
                         <li key={person.name}>
                             <div
                                 aria-hidden="true"
@@ -290,17 +215,21 @@ export default function About() {
                     <div className="lg:col-span-5">
                         <SectionHeading
                             id="contact-title"
-                            kicker="Contact us"
-                            title="Talk to the newsroom."
-                            description="Tips, corrections, partnerships or a simple hello. Choose the right inbox, or use the form and we will route it for you."
+                            kicker={t('about.contact.kicker')}
+                            title={t('about.contact.title')}
+                            description={t('about.contact.description')}
                         />
                         <ul className="mt-10 space-y-6">
-                            <ContactRow icon={<MapPin />} label="Visit">
-                                Level 18, Menara Meridian
-                                <br />
-                                182 Jalan Ampang, 50450 Kuala Lumpur
+                            <ContactRow
+                                icon={<MapPin />}
+                                label={t('about.contact.visit')}
+                            >
+                                {lines('about.contact.address')}
                             </ContactRow>
-                            <ContactRow icon={<Phone />} label="Call">
+                            <ContactRow
+                                icon={<Phone />}
+                                label={t('about.contact.call')}
+                            >
                                 <a
                                     href="tel:+60321814600"
                                     className="rounded-sm underline decoration-foreground/20 underline-offset-4 hover:decoration-brand focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -308,26 +237,30 @@ export default function About() {
                                     +60 3-2181 4600
                                 </a>
                             </ContactRow>
-                            <ContactRow icon={<Mail />} label="Write">
+                            <ContactRow
+                                icon={<Mail />}
+                                label={t('about.contact.write')}
+                            >
                                 <span className="grid gap-x-4 sm:grid-cols-[auto_1fr]">
                                     <span className="text-muted-foreground">
-                                        General
+                                        {t('about.contact.general')}
                                     </span>
                                     <EmailLink address="newsroom@meridian.example" />
                                     <span className="mt-2 text-muted-foreground sm:mt-0">
-                                        News tips
+                                        {t('about.contact.news_tips')}
                                     </span>
                                     <EmailLink address="tips@meridian.example" />
                                     <span className="mt-2 text-muted-foreground sm:mt-0">
-                                        Corrections
+                                        {t('about.contact.corrections')}
                                     </span>
                                     <EmailLink address="corrections@meridian.example" />
                                 </span>
                             </ContactRow>
-                            <ContactRow icon={<Clock />} label="Hours">
-                                Office: Monday to Friday, 9am to 6pm
-                                <br />
-                                The news desk is staffed every day.
+                            <ContactRow
+                                icon={<Clock />}
+                                label={t('about.contact.hours')}
+                            >
+                                {lines('about.contact.hours_lines')}
                             </ContactRow>
                         </ul>
                     </div>
@@ -380,13 +313,15 @@ function EmailLink({ address }: { address: string }) {
 }
 
 function ContactForm() {
+    const { t, list } = useI18n();
+
     return (
         <div className="rounded-3xl border border-foreground/10 bg-card p-6 shadow-sm sm:p-10">
             <h3 className="font-display text-2xl font-medium">
-                Send us a message
+                {t('about.form.title')}
             </h3>
             <p className="mt-2 text-sm text-muted-foreground">
-                All fields are required. We use your details only to reply.
+                {t('about.form.intro')}
             </p>
 
             <Form
@@ -398,7 +333,9 @@ function ContactForm() {
                 {({ processing, errors }) => (
                     <>
                         <div className="grid gap-2">
-                            <Label htmlFor="contact-name">Name</Label>
+                            <Label htmlFor="contact-name">
+                                {t('about.form.name')}
+                            </Label>
                             <Input
                                 id="contact-name"
                                 name="name"
@@ -419,7 +356,9 @@ function ContactForm() {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="contact-email">Email</Label>
+                            <Label htmlFor="contact-email">
+                                {t('about.form.email')}
+                            </Label>
                             <Input
                                 id="contact-email"
                                 name="email"
@@ -441,7 +380,9 @@ function ContactForm() {
                         </div>
 
                         <div className="grid gap-2 sm:col-span-2">
-                            <Label htmlFor="contact-topic">Topic</Label>
+                            <Label htmlFor="contact-topic">
+                                {t('about.form.topic')}
+                            </Label>
                             <Select
                                 name="topic"
                                 required
@@ -457,21 +398,25 @@ function ContactForm() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent position="popper">
-                                    {topics.map((topic) => (
-                                        <SelectItem
-                                            key={topic.value}
-                                            value={topic.value}
-                                        >
-                                            {topic.label}
-                                        </SelectItem>
-                                    ))}
+                                    {list<Topic>('about.form.topics').map(
+                                        (topic) => (
+                                            <SelectItem
+                                                key={topic.value}
+                                                value={topic.value}
+                                            >
+                                                {topic.label}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.topic} />
                         </div>
 
                         <div className="grid gap-2 sm:col-span-2">
-                            <Label htmlFor="contact-message">Message</Label>
+                            <Label htmlFor="contact-message">
+                                {t('about.form.message')}
+                            </Label>
                             <Textarea
                                 id="contact-message"
                                 name="message"
@@ -496,7 +441,7 @@ function ContactForm() {
                                     id="contact-message-hint"
                                     className="text-xs text-muted-foreground"
                                 >
-                                    At least 20 characters.
+                                    {t('about.form.message_hint')}
                                 </p>
                             )}
                         </div>
@@ -515,7 +460,7 @@ function ContactForm() {
                                         aria-label={undefined}
                                     />
                                 )}
-                                Send message
+                                {t('about.form.submit')}
                             </Button>
                         </div>
                     </>

@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Menu } from 'lucide-react';
+import { LogIn, Menu } from 'lucide-react';
 import { useState } from 'react';
 import {
     Sheet,
@@ -10,7 +10,10 @@ import {
     SheetTrigger,
 } from '@/components/ui/sheet';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { login } from '@/routes';
+import { LanguageSwitch } from './language-switch';
 import { siteNav } from './site-nav';
 import { SiteLogo } from './site-logo';
 import { ThemeToggle } from './theme-toggle';
@@ -20,17 +23,17 @@ const isoDate = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kuala_Lumpur',
 });
 
-const editionDate = new Intl.DateTimeFormat('en-MY', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Kuala_Lumpur',
-});
-
 export function SiteHeader() {
     const { isCurrentUrl } = useCurrentUrl();
     const [menuOpen, setMenuOpen] = useState(false);
+    const { t, intlLocale } = useI18n();
+    const editionDate = new Intl.DateTimeFormat(intlLocale, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'Asia/Kuala_Lumpur',
+    });
     // The menu slides in from the inline end: right in English, left in RTL.
     const menuSide =
         typeof document !== 'undefined' &&
@@ -49,18 +52,19 @@ export function SiteHeader() {
                         <span aria-hidden="true" className="mx-2">
                             ·
                         </span>
-                        Kuala Lumpur edition
+                        {t('common.site.edition')}
                     </p>
-                    <p className="tracking-wide">
-                        Independent journalism for Malaysia
-                    </p>
+                    <p className="tracking-wide">{t('common.site.tagline')}</p>
                 </div>
             </div>
 
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                 <SiteLogo />
 
-                <nav aria-label="Main" className="hidden md:block">
+                <nav
+                    aria-label={t('common.site.main_nav')}
+                    className="hidden md:block"
+                >
                     <ul className="flex items-center gap-1">
                         {siteNav.map((item) => {
                             const current = isCurrentUrl(item.href);
@@ -78,7 +82,7 @@ export function SiteHeader() {
                                                 'text-foreground after:absolute after:inset-x-4 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary',
                                         )}
                                     >
-                                        {item.label}
+                                        {t(`common.nav.${item.key}`)}
                                     </Link>
                                 </li>
                             );
@@ -87,6 +91,18 @@ export function SiteHeader() {
                 </nav>
 
                 <div className="flex items-center gap-1">
+                    <LanguageSwitch className="hidden md:inline-flex" />
+                    <Link
+                        href={login()}
+                        aria-label={t('common.footer.staff_sign_in')}
+                        title={t('common.footer.staff_sign_in')}
+                        className="hidden size-10 items-center justify-center rounded-full text-foreground transition-[background-color,transform] duration-150 ease-out-strong hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.97] md:inline-flex"
+                    >
+                        <LogIn
+                            className="size-5 rtl:-scale-x-100"
+                            aria-hidden="true"
+                        />
+                    </Link>
                     <ThemeToggle />
 
                     <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -94,13 +110,14 @@ export function SiteHeader() {
                             <button
                                 type="button"
                                 className="inline-flex size-10 items-center justify-center rounded-full text-foreground transition-[background-color,transform] duration-150 ease-out-strong hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.97] md:hidden"
-                                aria-label="Open menu"
+                                aria-label={t('common.site.open_menu')}
                             >
                                 <Menu className="size-5" aria-hidden="true" />
                             </button>
                         </SheetTrigger>
                         <SheetContent
                             side={menuSide}
+                            closeLabel={t('common.site.close')}
                             className="w-[85vw] max-w-sm pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
                         >
                             <SheetHeader className="border-b border-foreground/10">
@@ -108,10 +125,13 @@ export function SiteHeader() {
                                     Meridian
                                 </SheetTitle>
                                 <SheetDescription>
-                                    News and lifestyle from Kuala Lumpur.
+                                    {t('common.site.menu_description')}
                                 </SheetDescription>
                             </SheetHeader>
-                            <nav aria-label="Mobile" className="px-3 py-4">
+                            <nav
+                                aria-label={t('common.site.mobile_nav')}
+                                className="px-3 py-4"
+                            >
                                 <ul className="flex flex-col">
                                     {siteNav.map((item) => {
                                         const current = isCurrentUrl(item.href);
@@ -133,7 +153,9 @@ export function SiteHeader() {
                                                         current && 'text-brand',
                                                     )}
                                                 >
-                                                    {item.label}
+                                                    {t(
+                                                        `common.nav.${item.key}`,
+                                                    )}
                                                     {current && (
                                                         <span
                                                             aria-hidden="true"
@@ -145,7 +167,23 @@ export function SiteHeader() {
                                         );
                                     })}
                                 </ul>
+                                <div className="mt-3 border-t border-foreground/10 pt-3">
+                                    <Link
+                                        href={login()}
+                                        onClick={() => setMenuOpen(false)}
+                                        className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-base font-medium text-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    >
+                                        <LogIn
+                                            className="size-5 rtl:-scale-x-100"
+                                            aria-hidden="true"
+                                        />
+                                        {t('common.footer.staff_sign_in')}
+                                    </Link>
+                                </div>
                             </nav>
+                            <div className="border-t border-foreground/10 px-6 py-4">
+                                <LanguageSwitch />
+                            </div>
                         </SheetContent>
                     </Sheet>
                 </div>

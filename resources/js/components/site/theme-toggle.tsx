@@ -1,11 +1,12 @@
 import { Moon, Sun } from 'lucide-react';
 import { useAppearance } from '@/hooks/use-appearance';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const THEME_COLORS = { light: '#ffffff', dark: '#0c0a09' } as const;
 
 /** Keep the phone's status bar in step with a manual theme switch. */
-function syncThemeColor(mode: keyof typeof THEME_COLORS): void {
+export function syncThemeColor(mode: keyof typeof THEME_COLORS): void {
     const metas = document.querySelectorAll<HTMLMetaElement>(
         'meta[name="theme-color"]',
     );
@@ -25,6 +26,7 @@ function syncThemeColor(mode: keyof typeof THEME_COLORS): void {
 export function ThemeToggle({ className }: { className?: string }) {
     const { resolvedAppearance, updateAppearance } = useAppearance();
     const isDark = resolvedAppearance === 'dark';
+    const { t } = useI18n();
 
     return (
         <button
@@ -34,7 +36,11 @@ export function ThemeToggle({ className }: { className?: string }) {
                 updateAppearance(next, event.currentTarget);
                 syncThemeColor(next);
             }}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={t(
+                isDark
+                    ? 'common.site.theme_to_light'
+                    : 'common.site.theme_to_dark',
+            )}
             className={cn(
                 'inline-flex size-10 items-center justify-center rounded-full text-foreground/70 transition-[color,background-color,transform] duration-150 ease-out-strong hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.97]',
                 className,

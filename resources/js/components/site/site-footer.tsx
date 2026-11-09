@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { useI18n } from '@/lib/i18n';
 import { about, login, privacy, terms } from '@/routes';
 import { useConsent } from './consent/consent-context';
 import { siteNav } from './site-nav';
@@ -9,6 +10,7 @@ const linkClass =
 
 export function SiteFooter() {
     const { reopen } = useConsent();
+    const { t, list } = useI18n();
 
     return (
         <footer className="bg-ink pb-[env(safe-area-inset-bottom)] text-ink-foreground">
@@ -20,14 +22,13 @@ export function SiteFooter() {
                             Meridian
                         </p>
                         <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-foreground/65">
-                            Independent news and lifestyle journalism from Kuala
-                            Lumpur, for everyone who calls Malaysia home.
+                            {t('common.footer.about')}
                         </p>
                     </div>
 
-                    <nav aria-label="Footer">
+                    <nav aria-label={t('common.site.footer_nav')}>
                         <h2 className="text-xs font-semibold tracking-[0.18em] text-ink-foreground/60 uppercase">
-                            Pages
+                            {t('common.footer.pages')}
                         </h2>
                         <ul className="mt-4 space-y-3">
                             {siteNav.map((item) => (
@@ -36,7 +37,7 @@ export function SiteFooter() {
                                         href={item.href}
                                         className={linkClass}
                                     >
-                                        {item.label}
+                                        {t(`common.nav.${item.key}`)}
                                     </Link>
                                 </li>
                             ))}
@@ -45,17 +46,17 @@ export function SiteFooter() {
 
                     <div>
                         <h2 className="text-xs font-semibold tracking-[0.18em] text-ink-foreground/60 uppercase">
-                            Your data
+                            {t('common.footer.your_data')}
                         </h2>
                         <ul className="mt-4 space-y-3">
                             <li>
                                 <Link href={privacy()} className={linkClass}>
-                                    Privacy Policy
+                                    {t('common.footer.privacy_policy')}
                                 </Link>
                             </li>
                             <li>
                                 <Link href={terms()} className={linkClass}>
-                                    Terms &amp; Conditions
+                                    {t('common.footer.terms')}
                                 </Link>
                             </li>
                             <li>
@@ -64,7 +65,7 @@ export function SiteFooter() {
                                     onClick={reopen}
                                     className={linkClass}
                                 >
-                                    Cookie settings
+                                    {t('common.footer.cookie_settings')}
                                 </button>
                             </li>
                         </ul>
@@ -72,15 +73,17 @@ export function SiteFooter() {
 
                     <div>
                         <h2 className="text-xs font-semibold tracking-[0.18em] text-ink-foreground/60 uppercase">
-                            Newsroom
+                            {t('common.footer.newsroom')}
                         </h2>
                         <address className="mt-4 space-y-3 text-sm leading-relaxed text-ink-foreground/70 not-italic">
                             <p>
-                                Level 18, Menara Meridian
-                                <br />
-                                182 Jalan Ampang
-                                <br />
-                                50450 Kuala Lumpur
+                                {list<string>('common.footer.address').map(
+                                    (line) => (
+                                        <span key={line} className="block">
+                                            {line}
+                                        </span>
+                                    ),
+                                )}
                             </p>
                             <p>
                                 <a
@@ -104,18 +107,19 @@ export function SiteFooter() {
 
                 <div className="mt-14 flex flex-col gap-4 border-t border-ink-foreground/15 pt-6 text-xs text-ink-foreground/60 sm:flex-row sm:items-center sm:justify-between">
                     <p>
-                        © {new Date().getFullYear()} Meridian Media Sdn. Bhd.
-                        All rights reserved.
+                        {t('common.footer.rights', {
+                            year: new Date().getFullYear(),
+                        })}
                     </p>
                     <p className="flex gap-5">
                         <Link
                             href={`${about.url()}#contact`}
                             className={linkClass}
                         >
-                            Send a tip
+                            {t('common.footer.send_tip')}
                         </Link>
                         <Link href={login()} className={linkClass}>
-                            Staff sign-in
+                            {t('common.footer.staff_sign_in')}
                         </Link>
                     </p>
                 </div>
