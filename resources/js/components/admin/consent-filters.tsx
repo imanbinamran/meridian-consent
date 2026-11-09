@@ -10,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ConsentFilterStrip } from './consent-filter-strip';
 import { DateRangePicker } from './date-range-picker';
 import type { ConsentFilters as Filters, ConsentStatus } from './types';
 
@@ -31,9 +32,20 @@ export function ConsentFilters({
     onReset,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
+    const [appliedSearch, setAppliedSearch] = useState(filters.search);
     const applySearch = useEffectEvent((value: string) =>
         onChange({ search: value || undefined }),
     );
+
+    // Follow a search changed from outside (the empty state's reset), unless
+    // the admin has typed something newer that is still on its way.
+    if (filters.search !== appliedSearch) {
+        setAppliedSearch(filters.search);
+
+        if (search.trim().toLowerCase() === (appliedSearch ?? '')) {
+            setSearch(filters.search ?? '');
+        }
+    }
 
     // Wait for a pause in typing before asking the server.
     useEffect(() => {
@@ -89,7 +101,14 @@ export function ConsentFilters({
                 </div>
             </div>
 
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+            <ConsentFilterStrip
+                filters={filters}
+                versions={versions}
+                currentVersion={currentVersion}
+                onChange={onChange}
+            />
+
+            <div className="hidden w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center @4xl/consents:flex">
                 <Label htmlFor="consent-version" className="sr-only">
                     Version
                 </Label>

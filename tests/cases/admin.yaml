@@ -31,6 +31,11 @@ sources:
           kind: chat,
           ref: 'Brief to show consent records in the admin portal (status, device, record detail, CSV columns, overview breakdowns)',
       }
+    - {
+          id: S5,
+          kind: chat,
+          ref: 'Brief to make /admin/consents work on a phone (one-column list, filter sheets, visible UTC on the record)',
+      }
 
 requirements:
     - id: REQ-1
@@ -114,6 +119,10 @@ requirements:
       text: A consent past its 365-day lifetime or on an older notice version reads Expired in the badge, record page, status filter and CSV; Withdrawn wins over Expired
       anchor: 'S3 config/consent.php'
       risk: { impact: 2, likelihood: 2 }
+    - id: REQ-21
+      text: When the content area is narrower than the table, /admin/consents is a one-column list with sheet filters and needs no sideways scrolling; the record page prints UTC as text
+      anchor: 'S5 mobile consents list'
+      risk: { impact: 2, likelihood: 3 }
 
 scope:
     in:
@@ -1248,3 +1257,65 @@ cases:
       cleanup: 'Rolled back by RefreshDatabase; the seeded row stays'
       tags: [pest, e2e]
       notes: 'ConsentStatusTest.php and admin.spec.ts. ADM-053 runs the axe check on the Expired badge.'
+
+    - id: ADM-055
+      title: The consents list works on a phone at 375px and 320px and follows the content width
+      type: ui
+      scenario_class: responsive
+      priority: P1
+      technique: state_transition
+      required: true
+      mutates: none
+      requirement_refs: [REQ-21]
+      role: admin
+      preconditions: ['Logged in as admin', Fixture F5]
+      steps:
+          - Open /admin/consents at 375px and at 320px with the seeded expired GUID
+          - Tap the row, filter through a chip and the funnel sheet, sort oldest first, and reset an empty result
+          - Open the page at 1000px and 1280px with the sidebar open
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Row content,
+                expected: 'The row shows the full GUID, Expired, the time, and v1 · Desktop · Chrome on Windows, is at least 44px tall, and the list does not scroll sideways',
+                provenance: REQ-21,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Row opens the record,
+                expected: 'Tapping the row opens the record page, which shows 2025-01-01 00:00:00 UTC as text',
+                provenance: REQ-21,
+            }
+          - {
+                id: A3,
+                kind: ui,
+                description: Filters,
+                expected: 'A chip sheet and the funnel sheet change the rows and the URL, the chip shows its value and the funnel counts active filters',
+                provenance: REQ-21,
+            }
+          - {
+                id: A4,
+                kind: ui,
+                description: Sort,
+                expected: 'Oldest first puts direction=asc in the URL and the seeded 2025 row first',
+                provenance: REQ-21,
+            }
+          - {
+                id: A5,
+                kind: ui,
+                description: Empty state,
+                expected: "'No consents match these filters' shows, and Reset clears the search and brings the rows back",
+                provenance: REQ-21,
+            }
+          - {
+                id: A6,
+                kind: ui,
+                description: Follows the content width,
+                expected: 'At 1000px with the sidebar open the list shows; at 1280px the table shows',
+                provenance: REQ-21,
+            }
+      cleanup: 'None. The test only reads seeded rows'
+      tags: [e2e]
+      notes: 'admin.spec.ts.'

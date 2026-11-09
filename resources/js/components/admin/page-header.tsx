@@ -8,7 +8,13 @@ type Props = {
 
 export function PageHeader({ title, description, actions }: Props) {
     return (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div
+            className={
+                description
+                    ? 'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'
+                    : 'flex items-center justify-between gap-3'
+            }
+        >
             <div className="min-w-0 space-y-1">
                 <h1 className="text-2xl font-semibold tracking-tight">
                     {title}

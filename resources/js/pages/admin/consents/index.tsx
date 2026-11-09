@@ -2,6 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Download, FileSearch, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConsentFilters } from '@/components/admin/consent-filters';
+import { ConsentsList } from '@/components/admin/consents-list';
 import { ConsentsTable } from '@/components/admin/consents-table';
 import { EmptyState } from '@/components/admin/empty-state';
 import { BUSY_DELAY_MS } from '@/components/admin/motion';
@@ -88,16 +89,20 @@ export default function ConsentsIndex({
 
     const reset = () => visit({ direction: filters.direction });
 
+    const recordUrl = (guid: string) =>
+        show.url(guid, {
+            query: toQuery(filters, consents.current_page),
+        });
+
     const errorMessages = Object.values(errors ?? {});
 
     return (
         <>
             <Head title="Consents" />
 
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+            <div className="@container/consents flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader
                     title="Consents"
-                    description={`Every recorded acceptance. Open a GUID to see its history. Times are shown in Malaysia time (${timezone}); hover a time to see UTC.`}
                     actions={
                         <Button variant="outline" asChild>
                             <a
@@ -143,30 +148,50 @@ export default function ConsentsIndex({
 
                 <Card className="gap-0 overflow-hidden py-0">
                     {consents.data.length > 0 ? (
-                        <ConsentsTable
-                            rows={consents.data}
-                            timeZone={timezone}
-                            direction={filters.direction}
-                            onSort={(direction) => update({ direction })}
-                            recordUrl={(guid) =>
-                                show.url(guid, {
-                                    query: toQuery(
-                                        filters,
-                                        consents.current_page,
-                                    ),
-                                })
-                            }
-                            busy={busy}
-                        />
+                        <>
+                            <div className="@4xl/consents:hidden">
+                                <ConsentsList
+                                    rows={consents.data}
+                                    timeZone={timezone}
+                                    recordUrl={recordUrl}
+                                    busy={busy}
+                                />
+                            </div>
+                            <div className="hidden @4xl/consents:block">
+                                <ConsentsTable
+                                    rows={consents.data}
+                                    timeZone={timezone}
+                                    direction={filters.direction}
+                                    onSort={(direction) =>
+                                        update({ direction })
+                                    }
+                                    recordUrl={recordUrl}
+                                    busy={busy}
+                                />
+                            </div>
+                        </>
                     ) : filtering ? (
                         <EmptyState
                             icon={FileSearch}
                             title="No consents match these filters"
                             description="Try a shorter part of the GUID, another version or status, or a wider date range."
                             action={
-                                <Button variant="outline" onClick={reset}>
-                                    Clear filters
-                                </Button>
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        className="@4xl/consents:hidden"
+                                        onClick={reset}
+                                    >
+                                        Reset
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="hidden @4xl/consents:inline-flex"
+                                        onClick={reset}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                </>
                             }
                         />
                     ) : (
