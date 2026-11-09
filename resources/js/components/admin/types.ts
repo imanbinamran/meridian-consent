@@ -32,6 +32,13 @@ export type ConsentRecord = ConsentDevice & {
     events: ConsentEvent[];
 };
 
+export type BreakdownBucket = {
+    label: string;
+    count: number;
+    /** One decimal place. A list's percents add up to exactly 100. */
+    percent: number;
+};
+
 export type RecentConsent = {
     id: number;
     guid: string;
@@ -54,6 +61,8 @@ export type OverviewStats = {
     declinedPrev7d: number;
     acceptRate30d: number | null;
     responses30d: number;
+    withdrawn30d: number;
+    totalWithdrawn: number;
     currentVersion: number;
     acceptedCurrentVersion: number;
 };
