@@ -3,22 +3,18 @@ import base from './playwright.config';
 
 /**
  * Visitor journeys on the browsers listed in browserstack.yml.
- * The BrowserStack SDK picks the browser, so projects here set no device.
  * Admin, a11y and the proof flow stay on the Chromium run in ci.yml.
+ *
+ * The BrowserStack SDK builds its own projects, one per browser, and drops any
+ * project-level testMatch or dependencies. So the filters sit at the top level,
+ * and the sign-in setup project cannot run here.
  *
  * Needs E2E_BASE_URL, because the app must already be running for the tunnel.
  */
 export default defineConfig({
     ...base,
-    projects: [
-        {
-            name: 'setup',
-            testMatch: /auth\.setup\.ts/,
-        },
-        {
-            name: 'visitor',
-            testMatch: /(consent|responsive)\.spec\.ts/,
-            dependencies: ['setup'],
-        },
-    ],
+    testMatch: /(consent|responsive)\.spec\.ts/,
+    // Needs the saved admin sign-in, which only the setup project creates.
+    grepInvert: /CON-041 a cookie matching a real/,
+    projects: [{ name: 'browserstack' }],
 });

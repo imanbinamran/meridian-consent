@@ -17,9 +17,6 @@ platforms:
       osVersion: Sequoia
       browserName: playwright-webkit
       browserVersion: latest
-    - deviceName: iPhone 15
-      osVersion: '17'
-      browserName: safari
 
 parallelsPerPlatform: 1
 

@@ -71,8 +71,7 @@ jobs:
           --health-retries=20
 
     env:
-      # BrowserStack's tunnel maps bs-local.com to the runner. iPhones cannot
-      # use 127.0.0.1 through it.
+      # BrowserStack's tunnel maps bs-local.com to the runner.
       E2E_BASE_URL: http://bs-local.com:8000
       PHP_CLI_SERVER_WORKERS: '4'
       CONSENT_THROTTLE: '1000'
