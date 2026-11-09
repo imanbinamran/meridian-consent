@@ -63,7 +63,7 @@ return [
             'agreement' => 'Dengan terus mengakses atau menggunakan laman ini, anda mengakui dan bersetuju dengan penggunaan kuki kami menurut <terms>Terma & Syarat</terms> dan <privacy>Penyata Privasi</privacy> kami.',
             'status_accepted' => 'Anda telah <strong>menerima</strong> pada :date. Pilih sekali lagi untuk mengubahnya.',
             'status_declined' => 'Anda telah <strong>menolak</strong> pada :date. Pilih sekali lagi untuk mengubahnya.',
-            'docked' => 'Baca selama mana yang anda perlukan. Buat pilihan untuk terus ke laman ini.',
+            'back' => 'Kembali ke notis',
             'decline' => 'Tolak',
             'accept' => 'Terima',
         ],

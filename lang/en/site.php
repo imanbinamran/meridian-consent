@@ -66,7 +66,7 @@ return [
             'agreement' => 'By continuing to access or use this site, you acknowledge and consent to our use of cookies in accordance with our <terms>Terms & Conditions</terms> and <privacy>Privacy Statement</privacy>.',
             'status_accepted' => 'You <strong>accepted</strong> on :date. Choose again to change it.',
             'status_declined' => 'You <strong>declined</strong> on :date. Choose again to change it.',
-            'docked' => 'Read as long as you need. Choose to continue to the site.',
+            'back' => 'Back to notice',
             'decline' => 'Decline',
             'accept' => 'Accept',
         ],
