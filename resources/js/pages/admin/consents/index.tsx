@@ -34,6 +34,7 @@ function toQuery(filters: Filters, page?: number) {
     return {
         search: filters.search || undefined,
         version: filters.version || undefined,
+        status: filters.status || undefined,
         from: filters.from || undefined,
         to: filters.to || undefined,
         direction: filters.direction === 'asc' ? 'asc' : undefined,
@@ -54,7 +55,11 @@ export default function ConsentsIndex({
 
     useEffect(() => () => window.clearTimeout(busyTimer.current), []);
     const filtering = Boolean(
-        filters.search || filters.version || filters.from || filters.to,
+        filters.search ||
+        filters.version ||
+        filters.status ||
+        filters.from ||
+        filters.to,
     );
 
     const visit = (next: Filters) => {
@@ -149,7 +154,7 @@ export default function ConsentsIndex({
                         <EmptyState
                             icon={FileSearch}
                             title="No consents match these filters"
-                            description="Try a shorter part of the GUID, another version or a wider date range."
+                            description="Try a shorter part of the GUID, another version or status, or a wider date range."
                             action={
                                 <Button variant="outline" onClick={reset}>
                                     Clear filters

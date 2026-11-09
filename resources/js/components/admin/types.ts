@@ -48,6 +48,7 @@ export type SortDirection = 'asc' | 'desc';
 export type ConsentFilters = {
     search?: string;
     version?: number;
+    status?: ConsentStatus;
     from?: string;
     to?: string;
     direction: SortDirection;

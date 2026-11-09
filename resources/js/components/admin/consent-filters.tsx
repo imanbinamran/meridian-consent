@@ -11,7 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { DateRangePicker } from './date-range-picker';
-import type { ConsentFilters as Filters } from './types';
+import type { ConsentFilters as Filters, ConsentStatus } from './types';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -52,7 +52,11 @@ export function ConsentFilters({
     }, [search, filters.search]);
 
     const active = Boolean(
-        filters.search || filters.version || filters.from || filters.to,
+        filters.search ||
+        filters.version ||
+        filters.status ||
+        filters.from ||
+        filters.to,
     );
 
     return (
@@ -113,6 +117,34 @@ export function ConsentFilters({
                                 {version === currentVersion && ' (current)'}
                             </SelectItem>
                         ))}
+                    </SelectContent>
+                </Select>
+
+                <Label htmlFor="consent-status" className="sr-only">
+                    Status
+                </Label>
+                <Select
+                    value={filters.status ?? 'all'}
+                    onValueChange={(value) =>
+                        onChange({
+                            status:
+                                value === 'all'
+                                    ? undefined
+                                    : (value as ConsentStatus),
+                        })
+                    }
+                >
+                    <SelectTrigger
+                        id="consent-status"
+                        className="w-full sm:w-40"
+                        aria-label="Status"
+                    >
+                        <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="withdrawn">Withdrawn</SelectItem>
                     </SelectContent>
                 </Select>
 

@@ -159,6 +159,52 @@ test('ADM-042 rows from before device details were kept read Unknown', function 
             ->where('consents.data.0.osFamily', 'Unknown'));
 });
 
+test('ADM-043 the status filter shows only that status', function (string $status, int $total) {
+    Consent::factory()->count(2)->create();
+    Consent::factory()->count(3)->withdrawn()->create();
+
+    $this->get(route('admin.consents.index', ['status' => $status]))
+        ->assertInertia(function (Assert $page) use ($status, $total) {
+            $page->where('consents.total', $total)->where('filters.status', $status);
+
+            expect(collect($page->toArray()['props']['consents']['data'])->pluck('status')->unique()->all())->toBe([$status]);
+        });
+})->with([
+    'active' => ['active', 2],
+    'withdrawn' => ['withdrawn', 3],
+]);
+
+test('ADM-043 no status means every status, and it is left out of the filters', function () {
+    Consent::factory()->create();
+    Consent::factory()->withdrawn()->create();
+
+    $this->get(route('admin.consents.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('consents.total', 2)
+            ->missing('filters.status'));
+});
+
+test('ADM-043 the status filter combines with the others and survives paging', function () {
+    Consent::factory()->count(26)->withdrawn()->create(['version' => 2]);
+    Consent::factory()->withdrawn()->create(['version' => 1]);
+    Consent::factory()->create(['version' => 2]);
+
+    $this->get(route('admin.consents.index', ['status' => 'withdrawn', 'version' => 2]))
+        ->assertInertia(function (Assert $page) {
+            $page->where('consents.total', 26);
+
+            expect($page->toArray()['props']['consents']['next_page_url'])
+                ->toContain('status=withdrawn')
+                ->toContain('version=2');
+        });
+});
+
+test('ADM-044 an unrecognised status is a validation error, not a 500', function () {
+    $this->get(route('admin.consents.index', ['status' => 'deleted']))
+        ->assertRedirect(route('admin.consents.index'))
+        ->assertSessionHasErrors('status');
+});
+
 test('ADM-047 the table never reads events and its queries do not grow with the rows', function () {
     $queriesFor = function (): array {
         DB::flushQueryLog();
