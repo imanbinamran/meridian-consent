@@ -17,7 +17,7 @@ class OverviewController extends Controller
 {
     private const CHART_DAYS = 30;
 
-    private const RECENT_LIMIT = 5;
+    private const RATE_WEEKS = 12;
 
     public function __invoke(): Response
     {
@@ -36,7 +36,6 @@ class OverviewController extends Controller
         $currentVersion = (int) config('consent.version');
 
         return Inertia::render('admin/overview', [
-            'timezone' => $timezone,
             'realtime' => $this->realtime(),
             'stats' => [
                 'totalAccepted' => Consent::query()->count(),
@@ -61,17 +60,10 @@ class OverviewController extends Controller
             'chart' => $this->dailySeries($today, $thirtyDaysAgo),
             'browsers' => $this->breakdown('browser_family', DeviceProfile::BROWSER_FAMILIES, $thirtyDaysAgo),
             'devices' => $this->breakdown('device_type', DeviceProfile::DEVICE_TYPES, $thirtyDaysAgo),
-            'recent' => Consent::query()
-                ->latest('accepted_at')
-                ->latest('id')
-                ->limit(self::RECENT_LIMIT)
-                ->get(['id', 'guid', 'version', 'accepted_at'])
-                ->map(fn (Consent $consent) => [
-                    'id' => $consent->id,
-                    'guid' => $consent->guid,
-                    'version' => $consent->version,
-                    'acceptedAt' => $consent->accepted_at->toIso8601ZuluString(),
-                ]),
+            'oses' => $this->breakdown('os_family', DeviceProfile::OS_FAMILIES, $thirtyDaysAgo),
+            'health' => $this->health(),
+            'acceptRate' => $this->weeklyAcceptRate($today),
+            'renewals' => $this->renewals($today),
         ]);
     }
 
@@ -183,6 +175,115 @@ class OverviewController extends Controller
             }
         }
 
+        return $this->buckets($counts);
+    }
+
+    /**
+     * Every consent by what it counts as right now. The three never overlap.
+     *
+     * @return list<array{label: string, count: int, percent: float}>
+     */
+    private function health(): array
+    {
+        return $this->buckets([
+            'Valid' => Consent::query()->whereStatus(Consent::STATUS_ACTIVE)->count(),
+            'Expired' => Consent::query()->whereStatus(Consent::STATUS_EXPIRED)->count(),
+            'Withdrawn' => Consent::query()->whereStatus(Consent::STATUS_WITHDRAWN)->count(),
+        ]);
+    }
+
+    /**
+     * Accept rate for each 7-day stretch ending today, oldest first. A week
+     * with no responses has a null rate, so the line breaks instead of
+     * pretending to be 0%.
+     *
+     * @return list<array{start: string, end: string, accepted: int, declined: int, rate: float|null}>
+     */
+    private function weeklyAcceptRate(CarbonImmutable $today): array
+    {
+        $since = $today->subDays(self::RATE_WEEKS * 7 - 1)->utc();
+        $accepted = $this->countPerLocalDay(Consent::query(), 'accepted_at', $since, $today);
+        $declined = $this->countPerLocalDay(ConsentDecline::query(), 'declined_at', $since, $today);
+
+        $weeks = [];
+
+        for ($weeksAgo = self::RATE_WEEKS - 1; $weeksAgo >= 0; $weeksAgo--) {
+            $end = $today->subDays($weeksAgo * 7);
+            $start = $end->subDays(6);
+            $acceptedThisWeek = 0;
+            $declinedThisWeek = 0;
+
+            for ($day = $start; $day->lte($end); $day = $day->addDay()) {
+                $acceptedThisWeek += $accepted[$day->toDateString()] ?? 0;
+                $declinedThisWeek += $declined[$day->toDateString()] ?? 0;
+            }
+
+            $responses = $acceptedThisWeek + $declinedThisWeek;
+
+            $weeks[] = [
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
+                'accepted' => $acceptedThisWeek,
+                'declined' => $declinedThisWeek,
+                'rate' => $responses > 0 ? round($acceptedThisWeek / $responses * 100, 1) : null,
+            ];
+        }
+
+        return $weeks;
+    }
+
+    /**
+     * When today's valid consents run out, by local month, from this month to
+     * the month the newest one expires. Every month is listed, even at zero.
+     *
+     * @return array{next30: int, months: list<array{month: string, count: int}>}
+     */
+    private function renewals(CarbonImmutable $today): array
+    {
+        $lifetime = (int) config('consent.lifetime.accepted');
+
+        $acceptedPerDay = $this->countPerLocalDay(
+            Consent::query()->whereStatus(Consent::STATUS_ACTIVE),
+            'accepted_at',
+            $today->subDays($lifetime + 1)->utc(),
+            $today,
+        );
+
+        $counts = [];
+        $last = $today->addDays($lifetime)->startOfMonth();
+
+        for ($month = $today->startOfMonth(); $month->lte($last); $month = $month->addMonth()) {
+            $counts[$month->format('Y-m')] = 0;
+        }
+
+        $next30 = 0;
+        $cutoff = $today->addDays(30);
+
+        foreach ($acceptedPerDay as $day => $count) {
+            $expires = CarbonImmutable::parse($day, $today->timezone)->addDays($lifetime);
+            $counts[$expires->format('Y-m')] += $count;
+
+            if ($expires->lte($cutoff)) {
+                $next30 += $count;
+            }
+        }
+
+        return [
+            'next30' => $next30,
+            'months' => array_map(
+                fn (string $month, int $count) => ['month' => $month, 'count' => $count],
+                array_keys($counts),
+                array_values($counts),
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $counts
+     * @return list<array{label: string, count: int, percent: float}>
+     */
+    private function buckets(array $counts): array
+    {
         $percents = $this->percentsTotalling100($counts);
 
         return array_map(

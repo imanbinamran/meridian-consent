@@ -2,14 +2,14 @@ import { Head, Link } from '@inertiajs/react';
 import {
     CheckCircle2,
     Download,
-    FileCheck2,
     Percent,
     Undo2,
     Users,
     XCircle,
 } from 'lucide-react';
+import { AcceptRateChart } from '@/components/admin/accept-rate-chart';
 import { ActivityChart } from '@/components/admin/activity-chart';
-import { BreakdownCard } from '@/components/admin/breakdown-card';
+import { ConsentHealth } from '@/components/admin/consent-health';
 import {
     comparisonHint,
     formatNumber,
@@ -18,38 +18,45 @@ import {
 } from '@/components/admin/format';
 import { LiveIndicator } from '@/components/admin/live-indicator';
 import { PageHeader } from '@/components/admin/page-header';
-import { RecentAcceptances } from '@/components/admin/recent-acceptances';
+import { RenewalsChart } from '@/components/admin/renewals-chart';
 import { StatCard } from '@/components/admin/stat-card';
 import type {
     BreakdownBucket,
     DailyPoint,
     OverviewStats,
     RealtimeConfig,
-    RecentConsent,
+    Renewals,
+    WeeklyRate,
 } from '@/components/admin/types';
+import { WhoAccepted } from '@/components/admin/who-accepted';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useLiveOverview } from '@/hooks/use-live-overview';
 import { dashboard } from '@/routes';
 import { exportMethod, index as consentsIndex } from '@/routes/admin/consents';
 
 type Props = {
-    timezone: string;
     realtime: RealtimeConfig | null;
     stats: OverviewStats;
     chart: DailyPoint[];
     browsers: BreakdownBucket[];
     devices: BreakdownBucket[];
-    recent: RecentConsent[];
+    oses: BreakdownBucket[];
+    health: BreakdownBucket[];
+    acceptRate: WeeklyRate[];
+    renewals: Renewals;
 };
 
 export default function Overview({
-    timezone,
     realtime,
     stats,
     chart,
     browsers,
     devices,
-    recent,
+    oses,
+    health,
+    acceptRate,
+    renewals,
 }: Props) {
     const liveStatus = useLiveOverview(realtime);
     const acceptedTrend = percentChange(stats.accepted7d, stats.acceptedPrev7d);
@@ -59,11 +66,24 @@ export default function Overview({
         <>
             <Head title="Overview" />
 
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+            <div className="flex flex-1 flex-col gap-4 p-4 md:px-6 md:py-5">
                 <PageHeader
                     title="Overview"
-                    description="How visitors are responding to the consent notice."
-                    status={<LiveIndicator status={liveStatus} />}
+                    status={
+                        <>
+                            <Badge variant="secondary" className="tabular-nums">
+                                v{stats.currentVersion}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {pluralize(stats.acceptedCurrentVersion, {
+                                    one: 'acceptance',
+                                    other: 'acceptances',
+                                })}{' '}
+                                on this version
+                            </span>
+                            <LiveIndicator status={liveStatus} />
+                        </>
+                    }
                     actions={
                         <>
                             <Button variant="outline" asChild>
@@ -83,7 +103,7 @@ export default function Overview({
 
                 <section
                     aria-label="Key numbers"
-                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
+                    className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5"
                 >
                     <StatCard
                         label="Total accepted"
@@ -126,6 +146,7 @@ export default function Overview({
                         hint={`${formatNumber(stats.totalWithdrawn)} all time`}
                     />
                     <StatCard
+                        className="col-span-2 lg:col-span-1"
                         label="Accept rate, 30d"
                         icon={Percent}
                         value={
@@ -139,45 +160,34 @@ export default function Overview({
                                 : `Of ${pluralize(stats.responses30d, { one: 'response', other: 'responses' })}`
                         }
                     />
-                    <StatCard
-                        label="Current version"
-                        icon={FileCheck2}
-                        value={`v${stats.currentVersion}`}
-                        hint={`${pluralize(stats.acceptedCurrentVersion, { one: 'acceptance', other: 'acceptances' })} on this version`}
-                    />
                 </section>
 
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="min-w-0 lg:col-span-2">
+                <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
+                    <div className="min-w-0 md:col-span-2">
                         <ActivityChart data={chart} />
                     </div>
                     <div className="min-w-0">
-                        <RecentAcceptances items={recent} timeZone={timezone} />
+                        <ConsentHealth buckets={health} />
                     </div>
+                    <div className="min-w-0">
+                        <AcceptRateChart weeks={acceptRate} />
+                    </div>
+                    <div className="min-w-0">
+                        <RenewalsChart renewals={renewals} />
+                    </div>
+                    <section
+                        aria-label="Accepted visitors only"
+                        className="min-w-0"
+                    >
+                        <WhoAccepted
+                            groups={[
+                                { title: 'Device', buckets: devices },
+                                { title: 'Browser', buckets: browsers },
+                                { title: 'OS', buckets: oses },
+                            ]}
+                        />
+                    </section>
                 </div>
-
-                <section
-                    aria-labelledby="breakdowns-heading"
-                    className="flex flex-col gap-3"
-                >
-                    <div className="space-y-1">
-                        <h2
-                            id="breakdowns-heading"
-                            className="text-lg font-semibold tracking-tight"
-                        >
-                            Accepted visitors only
-                        </h2>
-                        <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-                            Consents accepted in the last 30 days, including any
-                            later withdrawn. Declines are anonymous and carry no
-                            device data, so they are not counted here.
-                        </p>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <BreakdownCard title="Browser" buckets={browsers} />
-                        <BreakdownCard title="Device" buckets={devices} />
-                    </div>
-                </section>
             </div>
         </>
     );

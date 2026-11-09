@@ -83,8 +83,10 @@ test.describe('with a fake socket', () => {
             .poll(() => readNumber(totalAccepted(page)))
             .toBeGreaterThan(before);
         expect(refetches.fields[0].split(',').sort()).toEqual([
+            'acceptRate',
             'chart',
-            'recent',
+            'health',
+            'renewals',
             'stats',
         ]);
         await expect(page).toHaveURL(/\/admin\/?$/);

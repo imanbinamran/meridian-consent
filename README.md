@@ -48,16 +48,16 @@ Sign in to the admin with `admin@meridian.test` and the password I'm sharing sep
 
 Every case ID below is written up in [`tests/cases/`](tests/cases), with the brief rule it proves.
 
-| Brief                                                                          | Where it lives                                                                                                                        | Proved by                                                     |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 4 pages, mobile friendly                                                       | `/`, `/about`, `/privacy`, `/terms`. Checked from 320px up, light and dark, and right to left.                                        | CON-001, CON-002, CON-003                                     |
-| Consent box on first visit, page can't scroll                                  | The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                              | CON-010, CON-020, CON-022                                     |
-| Exact copy, with links to Terms and Privacy                                    | `resources/js/components/site/consent/consent-dialog.tsx`                                                                             | CON-011, CON-012                                              |
-| Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | `consent` cookie plus a row in `consents`                                                                                             | CON-030, CON-031, CON-032                                     |
-| Box stays away until the cookie expires or is gone                             | Checked on the server on every page, and against the database                                                                         | CON-033, CON-040, CON-041, CON-072                            |
-| Decline: cookie with the time, lasts 1 day                                     | `consent_declined` cookie                                                                                                             | CON-050, CON-051, CON-052                                     |
-| Bonus: secured admin portal                                                    | `/admin`: overview, 30-day chart, browser and device breakdowns, searchable table with a status filter, a page per record, CSV export | ADM-002, ADM-020, ADM-030, ADM-040, ADM-043, ADM-045, ADM-049 |
-| Database scripts                                                               | `database/migrations`, plus `database/schema.sql` as plain SQL                                                                        | Pest runs on MySQL 8.4 in CI                                  |
+| Brief                                                                          | Where it lives                                                                                                                                                                       | Proved by                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| 4 pages, mobile friendly                                                       | `/`, `/about`, `/privacy`, `/terms`. Checked from 320px up, light and dark, and right to left.                                                                                       | CON-001, CON-002, CON-003                                     |
+| Consent box on first visit, page can't scroll                                  | The server decides, so the scroll lock is in the first HTML, before any JavaScript runs.                                                                                             | CON-010, CON-020, CON-022                                     |
+| Exact copy, with links to Terms and Privacy                                    | `resources/js/components/site/consent/consent-dialog.tsx`                                                                                                                            | CON-011, CON-012                                              |
+| Accept: cookie with GUID, time, version 1, lasts 1 year, saved to the database | `consent` cookie plus a row in `consents`                                                                                                                                            | CON-030, CON-031, CON-032                                     |
+| Box stays away until the cookie expires or is gone                             | Checked on the server on every page, and against the database                                                                                                                        | CON-033, CON-040, CON-041, CON-072                            |
+| Decline: cookie with the time, lasts 1 day                                     | `consent_declined` cookie                                                                                                                                                            | CON-050, CON-051, CON-052                                     |
+| Bonus: secured admin portal                                                    | `/admin`: overview, 30-day chart, consent health, accept rate, renewals due, device, browser and OS breakdowns, searchable table with a status filter, a page per record, CSV export | ADM-002, ADM-020, ADM-030, ADM-040, ADM-043, ADM-045, ADM-049 |
+| Database scripts                                                               | `database/migrations`, plus `database/schema.sql` as plain SQL                                                                                                                       | Pest runs on MySQL 8.4 in CI                                  |
 
 ## Required vs bonus
 
@@ -86,7 +86,7 @@ The admin overview, with seeded demo data:
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/admin-overview-dark.png">
-    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, the latest acceptances, and browser and device breakdowns" width="100%">
+    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, consent health, weekly accept rate, renewals due, and who accepted by device, browser and OS" width="100%">
   </picture>
 </p>
 

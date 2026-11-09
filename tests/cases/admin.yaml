@@ -154,7 +154,7 @@ requirements:
       anchor: 'S6 throttle, trailing edge'
       risk: { impact: 2, likelihood: 2 }
     - id: REQ-27
-      text: The overview's stats, chart and recent list update on their own when a consent is accepted, declined or withdrawn
+      text: The overview's stats and charts update on their own when a consent is accepted, declined or withdrawn
       anchor: 'S6 subscribe and refetch'
       risk: { impact: 2, likelihood: 2 }
     - id: REQ-28
@@ -1133,7 +1133,7 @@ cases:
                 id: A3,
                 kind: ui,
                 description: Breakdowns,
-                expected: 'Browser and Device lists each include Unknown and their percentages add up to 100',
+                expected: 'Browser, Device and OS lists each include Unknown and their percentages add up to 100',
                 provenance: REQ-18,
             }
           - {
@@ -1519,7 +1519,7 @@ cases:
                 id: A1,
                 kind: ui,
                 description: Live,
-                expected: "'Live' shows in a polite status region and an announced change updates the numbers with a partial reload of stats, chart and recent",
+                expected: "'Live' shows in a polite status region and an announced change updates the numbers with a partial reload of stats, chart, health, accept rate and renewals",
                 provenance: REQ-27,
             }
           - {
@@ -1922,3 +1922,60 @@ cases:
       cleanup: 'none needed: read only'
       tags: [e2e, pest]
       notes: 'admin.spec.ts. ConsentIndexTest.php proves partial words, two words, the text as the table shows it, Unknown and that GUID search still works.'
+
+    - id: ADM-070
+      title: The overview fits a 1280 by 720 laptop without scrolling
+      type: web
+      scenario_class: flow
+      priority: P2
+      technique: boundary
+      required: false
+      mutates: none
+      role: admin
+      preconditions: ['Logged in as admin', 'Demo consents seeded']
+      steps:
+          - Open /admin at 1280 by 720
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: No scroll,
+                expected: 'The page is no taller than the screen and the five number cards share one row',
+                provenance: 'Owner request, 9 Nov 2026',
+            }
+      cleanup: 'none needed'
+      tags: [e2e]
+      notes: 'admin.spec.ts.'
+
+    - id: ADM-071
+      title: On a phone the overview has no sideways scroll and its details open on tap
+      type: web
+      scenario_class: flow
+      priority: P2
+      technique: boundary
+      required: false
+      mutates: none
+      role: admin
+      preconditions: ['Logged in as admin', 'Demo consents seeded']
+      steps:
+          - Open /admin at 375px and 320px with touch
+          - Tap the Browser row under Who accepted
+          - Tap the latest week on the Accept rate chart
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Row detail,
+                expected: 'The tap opens the full Browser list',
+                provenance: 'Owner request, 9 Nov 2026',
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Chart detail,
+                expected: 'The tap shows that week with its accepted and declined counts, and the page does not scroll sideways',
+                provenance: 'Owner request, 9 Nov 2026',
+            }
+      cleanup: 'none needed'
+      tags: [e2e]
+      notes: 'admin.spec.ts.'

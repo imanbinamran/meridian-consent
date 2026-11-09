@@ -42,7 +42,6 @@ test('the stat cards count by Malaysia day', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('admin/overview')
-            ->where('timezone', 'Asia/Kuala_Lumpur')
             ->where('stats.totalAccepted', 5)
             ->where('stats.totalDeclined', 3)
             ->where('stats.accepted7d', 2)
@@ -61,8 +60,7 @@ test('the accept rate is null when nobody has responded', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('stats.totalAccepted', 0)
             ->where('stats.acceptRate30d', null)
-            ->has('chart', 30)
-            ->has('recent', 0),
+            ->has('chart', 30),
         );
 });
 
@@ -99,20 +97,6 @@ test('the current version card counts acceptances on that version only', functio
         );
 });
 
-test('recent acceptances shows the latest five, newest first', function () {
-    foreach (range(1, 7) as $day) {
-        Consent::factory()->create(['accepted_at' => "2026-11-0{$day} 01:00:00"]);
-    }
-
-    $this->get(route('dashboard'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->has('recent', 5)
-            ->where('recent.0.acceptedAt', '2026-11-07T01:00:00Z')
-            ->where('recent.4.acceptedAt', '2026-11-03T01:00:00Z')
-            ->has('recent.0', fn (Assert $row) => $row->hasAll(['id', 'guid', 'version', 'acceptedAt'])),
-        );
-});
-
 /**
  * @param  list<array{label: string, count: int, percent: float|int}>  $buckets
  * @return array<string, array{int, float|int}>
@@ -131,6 +115,50 @@ test('ADM-049 the withdrawn count covers withdrawals in the 30-day window and al
         ->assertInertia(fn (Assert $page) => $page
             ->where('stats.withdrawn30d', 1)
             ->where('stats.totalWithdrawn', 2));
+});
+
+test('consent health sorts every consent into valid, expired or withdrawn', function () {
+    Consent::factory()->count(2)->create(['accepted_at' => '2026-11-01 00:00:00']);
+    Consent::factory()->create(['accepted_at' => '2025-01-01 00:00:00']); // over a year old
+    Consent::factory()->create(['accepted_at' => '2026-11-01 00:00:00', 'version' => 0]); // older notice
+    Consent::factory()->withdrawn()->create(['accepted_at' => '2025-01-01 00:00:00']); // withdrawn wins
+
+    $this->get(route('dashboard'))
+        ->assertInertia(function (Assert $page) {
+            expect(byLabel($page->toArray()['props']['health']))->toEqual([
+                'Valid' => [2, 40],
+                'Expired' => [2, 40],
+                'Withdrawn' => [1, 20],
+            ]);
+        });
+});
+
+test('the weekly accept rate covers 12 stretches ending today and leaves quiet weeks null', function () {
+    seedOverviewData();
+
+    $this->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('acceptRate', 12)
+            ->where('acceptRate.11', ['start' => '2026-11-02', 'end' => '2026-11-08', 'accepted' => 2, 'declined' => 1, 'rate' => 66.7])
+            ->where('acceptRate.10.start', '2026-10-26')
+            ->where('acceptRate.10.rate', 100)
+            ->where('acceptRate.0.rate', null));
+});
+
+test('renewals count only valid consents, by the local month they expire', function () {
+    Consent::factory()->create(['accepted_at' => '2025-11-20 00:00:00']); // expires 20 Nov 2026
+    Consent::factory()->create(['accepted_at' => '2026-02-10 00:00:00']); // expires 10 Feb 2027
+    Consent::factory()->create(['accepted_at' => '2026-10-31 20:00:00']); // 04:00 KL on 1 Nov, expires 1 Nov 2027
+    Consent::factory()->withdrawn()->create(['accepted_at' => '2025-11-20 00:00:00']);
+    Consent::factory()->create(['accepted_at' => '2025-01-01 00:00:00']); // already expired
+
+    $this->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('renewals.next30', 1)
+            ->has('renewals.months', 13)
+            ->where('renewals.months.0', ['month' => '2026-11', 'count' => 1])
+            ->where('renewals.months.3', ['month' => '2027-02', 'count' => 1])
+            ->where('renewals.months.12', ['month' => '2027-11', 'count' => 1]));
 });
 
 test('ADM-050 the breakdowns only count consents accepted in the 30-day window', function () {

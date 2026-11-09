@@ -17,12 +17,20 @@ type Props = {
     icon: LucideIcon;
     hint?: ReactNode;
     trend?: Trend | null;
+    className?: string;
 };
 
-export function StatCard({ label, value, icon: Icon, hint, trend }: Props) {
+export function StatCard({
+    label,
+    value,
+    icon: Icon,
+    hint,
+    trend,
+    className,
+}: Props) {
     return (
-        <Card className="@container min-w-0 gap-3 py-5">
-            <CardHeader className="flex flex-row items-start justify-between gap-2 px-5">
+        <Card className={cn('@container min-w-0 gap-2 py-4', className)}>
+            <CardHeader className="flex flex-row items-start justify-between gap-1 px-3.5">
                 <h3 className="min-w-0 text-sm font-medium text-muted-foreground">
                     {label}
                 </h3>
@@ -31,7 +39,7 @@ export function StatCard({ label, value, icon: Icon, hint, trend }: Props) {
                     aria-hidden
                 />
             </CardHeader>
-            <CardContent className="space-y-1 px-5">
+            <CardContent className="space-y-1 px-3.5">
                 {/* Numbers never truncate: the size steps down with the card instead. */}
                 <p className="text-2xl font-semibold tracking-tight tabular-nums @[13rem]:text-3xl">
                     {value}
