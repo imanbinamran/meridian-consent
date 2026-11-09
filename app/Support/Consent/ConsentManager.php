@@ -69,12 +69,16 @@ final class ConsentManager
         }
 
         $consent = AcceptedConsent::issue($this->now(), $this->version());
+        $device = DeviceProfile::fromUserAgent($request->userAgent());
 
-        DB::transaction(function () use ($consent): void {
+        DB::transaction(function () use ($consent, $device): void {
             Consent::query()->create([
                 'guid' => $consent->guid,
                 'version' => $consent->version,
                 'accepted_at' => $consent->acceptedAt,
+                'device_type' => $device->deviceType,
+                'browser_family' => $device->browserFamily,
+                'os_family' => $device->osFamily,
             ]);
 
             $this->recordEvent($consent, ConsentEvent::ACCEPTED, $consent->acceptedAt);

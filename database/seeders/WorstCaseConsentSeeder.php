@@ -5,8 +5,10 @@ namespace Database\Seeders;
 use App\Models\Consent;
 use App\Models\ConsentDecline;
 use App\Models\ConsentEvent;
+use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 /**
@@ -23,6 +25,8 @@ use Illuminate\Support\Str;
  *   GUID from an import, and a date-style version number (2026110801).
  * - One row a year old, so "oldest first" shows an absolute date.
  * - 1 in 20 acceptances withdrawn, and an audit trail for every consent.
+ * - The edge-case rows have no device details, like rows from before they
+ *   were collected. The bulk rows have every combination.
  * - One decline, a month ago: singular copy, a 7-day count of 0 and no
  *   trend to compare against.
  */
@@ -63,7 +67,17 @@ class WorstCaseConsentSeeder extends Seeder
                 $guid = (string) Str::uuid();
                 $withdrawnAt = random_int(1, 20) === 1 ? min($acceptedAt->addHours(random_int(1, 48)), $now) : null;
 
-                $rows[] = ['guid' => $guid, 'version' => 1, 'accepted_at' => $at, 'withdrawn_at' => $withdrawnAt?->format('Y-m-d H:i:s'), 'created_at' => $at, 'updated_at' => $at];
+                $rows[] = [
+                    'guid' => $guid,
+                    'version' => 1,
+                    'accepted_at' => $at,
+                    'withdrawn_at' => $withdrawnAt?->format('Y-m-d H:i:s'),
+                    'device_type' => Arr::random(DeviceProfile::DEVICE_TYPES),
+                    'browser_family' => Arr::random(DeviceProfile::BROWSER_FAMILIES),
+                    'os_family' => Arr::random(DeviceProfile::OS_FAMILIES),
+                    'created_at' => $at,
+                    'updated_at' => $at,
+                ];
                 array_push($events, ...$this->events($guid, 1, $acceptedAt, $withdrawnAt));
             }
 

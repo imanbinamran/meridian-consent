@@ -56,6 +56,9 @@ CREATE TABLE `consents` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `withdrawn_at` timestamp NULL DEFAULT NULL,
+  `device_type` varchar(16) DEFAULT NULL,
+  `browser_family` varchar(16) DEFAULT NULL,
+  `os_family` varchar(16) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `consents_guid_unique` (`guid`),
   KEY `consents_accepted_at_index` (`accepted_at`)

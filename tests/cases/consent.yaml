@@ -136,6 +136,18 @@ requirements:
       text: 'Declining with a verified cookie withdraws that consent: the GUID stops being valid, even if the old cookie is replayed, and a later Accept issues a new GUID'
       anchor: 'S3 app/Support/Consent/ConsentManager.php withdraw'
       risk: { impact: 3, likelihood: 2 }
+    - id: REQ-28
+      text: 'At first accept the server stores coarse device_type, browser_family and os_family parsed from the User-Agent header; they are set once and accepted rows only'
+      anchor: 'S3 app/Support/Consent/DeviceProfile.php'
+      risk: { impact: 2, likelihood: 2 }
+    - id: REQ-29
+      text: 'The raw user agent, IP address or anything fingerprint-like is never stored with consent data or logged by the consent flow'
+      anchor: 'S3 database/migrations/2026_11_09_000002_add_device_fields_to_consents.php'
+      risk: { impact: 3, likelihood: 2 }
+    - id: REQ-30
+      text: 'The Privacy Statement says truthfully that coarse device details are kept on accept and that declining afterwards marks the record withdrawn'
+      anchor: 'S3 resources/js/pages/site/privacy.tsx'
+      risk: { impact: 3, likelihood: 2 }
 
 scope:
     in:
@@ -1554,3 +1566,110 @@ cases:
             }
       cleanup: 'Rolled back by RefreshDatabase'
       tags: [pest]
+
+    - id: CON-087
+      title: User agents map to the agreed coarse values
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: equivalence
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-28]
+      role: visitor
+      preconditions: ['None']
+      steps:
+          - Parse each sample user agent, including Edge, Chrome, Safari, Firefox, Android tablets, iPadOS and an empty header
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Correct family,
+                expected: 'Edge does not read as Chrome, Chrome does not read as Safari, Android tablets read as Tablet, and each value is in its allowed list',
+                provenance: REQ-28,
+            }
+      cleanup: 'None'
+      tags: [pest]
+      notes: 'iPadOS Safari can report as macOS Desktop; the header alone cannot tell.'
+
+    - id: CON-088
+      title: Device details are set once at first accept
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-28]
+      role: visitor
+      preconditions: [Fixture F2]
+      steps:
+          - POST accept from an Android tablet
+          - POST accept again from Windows Firefox with the returned cookie
+          - POST decline from Windows Firefox with that cookie
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Set once,
+                expected: 'The row reads Tablet, Chrome, Android after every step',
+                provenance: REQ-28,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-089
+      title: The raw user agent and IP are not persisted or logged
+      type: api
+      scenario_class: persistence
+      priority: P1
+      technique: negative
+      required: true
+      mutates: test_data
+      requirement_refs: [REQ-29]
+      role: visitor
+      preconditions:
+          [Fixture F2, 'A user agent with a unique marker', 'A test IP address']
+      steps:
+          - POST accept and decline with that user agent and IP
+      assertions:
+          - {
+                id: A1,
+                kind: state,
+                description: Not persisted,
+                expected: 'Neither value appears in consents, consent_events, consent_declines or the cookie, and consents has no extra columns',
+                provenance: REQ-29,
+            }
+          - {
+                id: A2,
+                kind: state,
+                description: Not logged,
+                expected: 'The consent flow writes no log line',
+                provenance: REQ-29,
+            }
+      cleanup: 'Rolled back by RefreshDatabase'
+      tags: [pest]
+
+    - id: CON-090
+      title: The Privacy Statement describes device details and withdrawal
+      type: web
+      scenario_class: render
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-30]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Open /privacy
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Truthful copy,
+                expected: 'The page names device type, browser family and operating system family, says declining marks the record withdrawn, and no longer says the ID is not linked to a device',
+                provenance: REQ-30,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]

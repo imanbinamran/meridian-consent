@@ -14,13 +14,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $version
  * @property CarbonImmutable $accepted_at
  * @property CarbonImmutable|null $withdrawn_at
+ * @property string|null $device_type
+ * @property string|null $browser_family
+ * @property string|null $os_family
  */
 class Consent extends Model
 {
     /** @use HasFactory<ConsentFactory> */
     use HasFactory;
 
-    protected $fillable = ['guid', 'version', 'accepted_at', 'withdrawn_at'];
+    protected $fillable = [
+        'guid',
+        'version',
+        'accepted_at',
+        'withdrawn_at',
+        'device_type',
+        'browser_family',
+        'os_family',
+    ];
 
     protected function casts(): array
     {

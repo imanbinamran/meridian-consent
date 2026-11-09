@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Consent;
 use App\Models\ConsentEvent;
+use App\Support\Consent\DeviceProfile;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -21,6 +22,9 @@ class ConsentFactory extends Factory
             'guid' => (string) Str::uuid(),
             'version' => config('consent.version'),
             'accepted_at' => fake()->dateTimeBetween('-30 days'),
+            'device_type' => fake()->randomElement(DeviceProfile::DEVICE_TYPES),
+            'browser_family' => fake()->randomElement(DeviceProfile::BROWSER_FAMILIES),
+            'os_family' => fake()->randomElement(DeviceProfile::OS_FAMILIES),
         ];
     }
 

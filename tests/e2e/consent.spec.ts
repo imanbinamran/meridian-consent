@@ -492,6 +492,21 @@ test.describe('withdrawing consent', () => {
     });
 });
 
+test.describe('privacy statement', () => {
+    test('CON-090 says what device details we keep and what withdrawing does', async ({
+        page,
+    }) => {
+        await page.goto('/privacy');
+        const main = page.locator('body');
+
+        await expect(main).toContainText('Browser family');
+        await expect(main).toContainText('Device type');
+        await expect(main).toContainText('Operating system family');
+        await expect(main).toContainText('mark your record in our database as');
+        await expect(main).not.toContainText('IP address or device');
+    });
+});
+
 test.describe('cookie settings', () => {
     test('CON-060 footer Cookie settings reopens the box after a choice', async ({
         page,
