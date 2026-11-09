@@ -817,7 +817,10 @@ cases:
       requirement_refs: [REQ-11]
       role: visitor
       preconditions:
-          [Fixture F1, 'ExpiredConsentSeeder row exists and reads Expired in the admin']
+          [
+              Fixture F1,
+              'ExpiredConsentSeeder row exists and reads Expired in the admin',
+          ]
       data:
           {
               cookie: 'consent = the seeded row {guid: 00000000-0000-4000-8000-000000000365, accepted_at: 2025-01-01T00:00:00Z, version: 1}, with 30 days left in the browser',
@@ -1308,7 +1311,10 @@ cases:
       requirement_refs: [REQ-24]
       role: visitor
       preconditions:
-          [Fixture F2, 'Queries on the consents table throw, with the schema untouched']
+          [
+              Fixture F2,
+              'Queries on the consents table throw, with the schema untouched',
+          ]
       steps:
           - POST the accept endpoint with a well-formed consent cookie
           - POST the accept endpoint with no cookie
@@ -1706,7 +1712,11 @@ cases:
       mutates: test_data
       requirement_refs: [REQ-31]
       role: visitor
-      preconditions: [Fixture F2, 'A version 1 row and its cookie, with CONSENT_VERSION raised to 2']
+      preconditions:
+          [
+              Fixture F2,
+              'A version 1 row and its cookie, with CONSENT_VERSION raised to 2',
+          ]
       steps:
           - POST the decline endpoint with the version 1 cookie
           - Repeat with a version 1 cookie whose time differs from its row

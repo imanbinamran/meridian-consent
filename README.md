@@ -64,12 +64,12 @@ Every case ID below is written up in [`tests/cases/`](tests/cases), with the bri
 - **Required by the brief:** the four pages, the consent box, the exact copy, the Accept and Decline cookies, the database row and the database scripts.
 - **Bonus in the brief:** the secured admin portal.
 - **Extras I added beyond the brief:**
-  - event history for each consent, shown on its own page in the admin
-  - withdrawal, when someone declines after accepting
-  - coarse device data, kept on accept only
-  - browser and device breakdowns on the overview
-  - the database check that stops forged cookies
-  - HttpOnly on both cookies
+    - event history for each consent, shown on its own page in the admin
+    - withdrawal, when someone declines after accepting
+    - coarse device data, kept on accept only
+    - browser and device breakdowns on the overview
+    - the database check that stops forged cookies
+    - HttpOnly on both cookies
 
 ## See it work
 

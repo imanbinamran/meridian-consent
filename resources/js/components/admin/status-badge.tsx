@@ -4,8 +4,7 @@ import type { ConsentStatus } from './types';
 const BADGES: Record<ConsentStatus, { label: string; className: string }> = {
     active: {
         label: 'Active',
-        className:
-            'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+        className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     },
     expired: {
         label: 'Expired',

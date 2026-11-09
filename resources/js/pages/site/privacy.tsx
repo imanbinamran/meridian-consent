@@ -263,8 +263,8 @@ export default function Privacy({ cookies }: PrivacyProps) {
                         again.
                     </p>
                     <p>
-                        If you had not accepted, we also add one line to a
-                        count of declines, holding just the time and the notice
+                        If you had not accepted, we also add one line to a count
+                        of declines, holding just the time and the notice
                         version. That line has no ID, IP address or browser
                         details in it. The session record described under
                         &ldquo;Other personal data&rdquo; is kept whatever you
