@@ -434,7 +434,7 @@ cases:
                 id: A3,
                 kind: ui,
                 description: Box still shown on target,
-                expected: "The 'Cookie consent' dialog is visible on /terms and /privacy, since no choice was made",
+                expected: "The 'Cookie consent' dialog is visible on /terms and /privacy, docked at the bottom, since no choice was made",
                 provenance: REQ-3,
             }
       tags: [e2e]
@@ -1793,3 +1793,175 @@ cases:
             }
       cleanup: 'Context closed at the end of the test'
       tags: [e2e]
+
+    - id: CON-013
+      title: Following a box link docks the box and the page scrolls
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-3, REQ-6]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Open /
+          - Activate the 'Terms & Conditions' link in the box
+          - Scroll the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Unlocked,
+                expected: 'The html element no longer has the scroll lock and the page scrolls past 0',
+                provenance: REQ-6,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Choice still owed,
+                expected: 'The Cookie consent dialog stays in view with Accept and Decline, and no consent cookie exists',
+                provenance: REQ-3,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-014
+      title: The docked box does not hide the end of the page
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: boundary_value
+      required: true
+      mutates: none
+      requirement_refs: [REQ-2]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Scroll to the end of the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Footer clear,
+                expected: 'The footer ends at or above the top edge of the docked box',
+                provenance: REQ-2,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-015
+      title: Going back or refreshing brings back the full box and lock
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: negative
+      required: true
+      mutates: none
+      requirement_refs: [REQ-3, REQ-4]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Go back, or refresh
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Gate restored,
+                expected: 'The blocking alertdialog is visible and the html element has the scroll lock',
+                provenance: REQ-4,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-016
+      title: Accept or Decline from the docked box records the choice
+      type: web
+      scenario_class: ui_state
+      priority: P1
+      technique: happy_path
+      required: true
+      mutates: local_state
+      requirement_refs: [REQ-3]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Activate Accept or Decline in the docked box
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Recorded,
+                expected: 'The matching consent cookie is set, the box is gone, the visitor stays on /terms',
+                provenance: REQ-3,
+            }
+          - {
+                id: A2,
+                kind: ui,
+                description: Remembered,
+                expected: 'Opening / shows no consent box',
+                provenance: REQ-3,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-017
+      title: A link in the reopened box closes it
+      type: web
+      scenario_class: ui_state
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: local_state
+      requirement_refs: [REQ-6]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Accept on /
+          - Reopen the box from Cookie settings
+          - Activate the 'Terms & Conditions' link
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Readable,
+                expected: 'URL path is /terms and the consent box is gone',
+                provenance: REQ-6,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
+
+    - id: CON-018
+      title: The docked box has no serious accessibility issues
+      type: web
+      scenario_class: render
+      priority: P2
+      technique: happy_path
+      required: true
+      mutates: none
+      requirement_refs: [REQ-2]
+      role: visitor
+      preconditions: ['Fresh browser context']
+      steps:
+          - Follow a box link to /terms
+          - Run axe on the page
+      assertions:
+          - {
+                id: A1,
+                kind: ui,
+                description: Axe,
+                expected: 'No serious or critical WCAG 2.2 AA violations',
+                provenance: REQ-2,
+            }
+      cleanup: 'Context closed at the end of the test'
+      tags: [e2e]
+      notes: 'consent.spec.ts'
