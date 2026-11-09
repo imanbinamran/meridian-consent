@@ -15,6 +15,7 @@ use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -84,6 +85,38 @@ function useReverbDriver(int $port = 8080): void
         'broadcasting.connections.reverb.options.scheme' => 'http',
         'broadcasting.connections.reverb.options.useTLS' => false,
     ]);
+
+    app(BroadcastManager::class)->forgetDrivers();
+
+    require base_path('routes/channels.php');
+}
+
+/**
+ * Use the real Pusher driver with made-up credentials, as useReverbDriver does.
+ * Queueing and signing need no Pusher account or network.
+ *
+ * @param  array<string, mixed>  $overrides  broadcasting.connections.pusher.* values
+ */
+function usePusherDriver(array $overrides = []): void
+{
+    config(['broadcasting.default' => 'pusher']);
+
+    $settings = [
+        'key' => 'pusher-public-key',
+        'secret' => 'pusher-very-secret',
+        'app_id' => 'pusher-app-id-77',
+        'custom_host' => null,
+        'options.cluster' => 'ap1',
+        'options.host' => 'api-ap1.pusher.com',
+        'options.port' => 443,
+        'options.scheme' => 'https',
+        'options.useTLS' => true,
+        ...$overrides,
+    ];
+
+    foreach ($settings as $name => $value) {
+        config(["broadcasting.connections.pusher.{$name}" => $value]);
+    }
 
     app(BroadcastManager::class)->forgetDrivers();
 
@@ -203,6 +236,92 @@ describe('what reaches the queue, with the real dispatcher', function () {
     })->with($changes);
 });
 
+// ADM-062
+describe('what reaches the queue on Pusher, with the real dispatcher', function () {
+    beforeEach(fn () => config(['queue.default' => 'database']));
+
+    $changes = [
+        'a new acceptance' => [fn () => test()->post(route('consent.accept'))],
+        'a newly counted decline' => [fn () => test()->post(route('consent.decline'))],
+        'a withdrawal' => [fn () => test()->withUnencryptedCookie('consent', recordedCookieValue())->post(route('consent.decline'))],
+    ];
+
+    test('with every setting there, exactly one job is queued', function (Closure $change) {
+        usePusherDriver();
+
+        $change();
+
+        expect(json_decode(DB::table('jobs')->sole()->payload, true)['displayName'])->toBe(ConsentsChanged::class);
+    })->with($changes);
+
+    test('with one setting missing, no job is queued', function (string $setting, mixed $blank) {
+        usePusherDriver();
+        config(["broadcasting.connections.pusher.{$setting}" => $blank]);
+
+        $this->post(route('consent.accept'));
+
+        expect(Consent::count())->toBe(1)
+            ->and(DB::table('jobs')->count())->toBe(0);
+    })->with([
+        'no key' => ['key', ''],
+        'no secret' => ['secret', ''],
+        'no app id' => ['app_id', ''],
+        'no cluster' => ['options.cluster', null],
+    ]);
+
+    test('a queued job gives up once and within the job timeout', function () {
+        usePusherDriver();
+
+        $this->post(route('consent.accept'));
+
+        $job = json_decode(DB::table('jobs')->sole()->payload, true);
+
+        expect($job['maxTries'])->toBe(1)
+            ->and($job['timeout'])->toBe(5);
+    });
+});
+
+// ADM-065
+describe('how Pusher fails', function () {
+    test('every call to Pusher gives up well inside the job timeout', function () {
+        usePusherDriver();
+
+        $settings = Broadcast::connection('pusher')->getPusher()->getSettings();
+        $clientOptions = config('broadcasting.connections.pusher.client_options');
+
+        expect($settings['timeout'])->toBe(2)
+            ->and($clientOptions)->toBe(['connect_timeout' => 1, 'timeout' => 2]);
+    });
+
+    test('the app still boots on the pusher connection with nothing set', function () {
+        $result = Process::path(base_path())->env([
+            'BROADCAST_CONNECTION' => 'pusher',
+            'PUSHER_APP_KEY' => false,
+            'PUSHER_APP_SECRET' => false,
+            'PUSHER_APP_ID' => false,
+            'PUSHER_APP_CLUSTER' => false,
+        ])->run([PHP_BINARY, 'artisan', 'route:list', '--path=broadcasting']);
+
+        expect($result->successful())->toBeTrue($result->errorOutput())
+            ->and(ConsentsChanged::liveUpdatesOn())->toBeFalse();
+    });
+
+    test('accepting still works when the Pusher call fails during the request', function () {
+        usePusherDriver([
+            'custom_host' => '127.0.0.1',
+            'options.host' => '127.0.0.1',
+            'options.port' => 1,
+            'options.scheme' => 'http',
+            'options.useTLS' => false,
+        ]);
+
+        $response = $this->from(route('privacy'))->post(route('consent.accept'));
+
+        $response->assertRedirect(route('privacy'));
+        expect(Consent::count())->toBe(1);
+    });
+});
+
 test('a failed send is not retried and fails fast', function () {
     $event = new ConsentsChanged;
 
@@ -306,6 +425,27 @@ describe('who may join the channel', function () {
     });
 });
 
+// ADM-064
+describe('who may join the channel on Pusher', function () {
+    beforeEach(fn () => usePusherDriver());
+
+    test('a guest is refused', function () {
+        authorizeLiveChannel()->assertForbidden();
+    });
+
+    test('a signed-in user with an unverified email is refused', function () {
+        $this->actingAs(User::factory()->unverified()->create());
+
+        authorizeLiveChannel()->assertForbidden();
+    });
+
+    test('a signed-in user with a verified email is let in', function () {
+        $this->actingAs(User::factory()->create());
+
+        expect(authorizeLiveChannel()->assertOk()->json('auth'))->toStartWith('pusher-public-key:');
+    });
+});
+
 describe('what the overview page is told', function () {
     beforeEach(fn () => $this->actingAs(User::factory()->create()));
 
@@ -338,4 +478,58 @@ describe('what the overview page is told', function () {
         ]));
         expect($response->getContent())->not->toContain('very-secret');
     });
+
+    // ADM-063
+    test('the key and cluster for hosted Pusher, and never the secret or app id', function () {
+        usePusherDriver();
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertInertia(fn (Assert $page) => $page->where('realtime', [
+            'service' => 'pusher',
+            'key' => 'pusher-public-key',
+            'cluster' => 'ap1',
+            'channel' => 'admin.consents',
+            'event' => 'consents.changed',
+        ]));
+        expect($response->getContent())->not->toContain('pusher-very-secret', 'pusher-app-id-77');
+    });
+
+    // ADM-063
+    test('the host, port and scheme too when PUSHER_HOST is set, and never the secret or app id', function () {
+        usePusherDriver([
+            'custom_host' => '127.0.0.1',
+            'options.host' => '127.0.0.1',
+            'options.port' => '8080',
+            'options.scheme' => 'http',
+            'options.useTLS' => false,
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertInertia(fn (Assert $page) => $page->where('realtime', [
+            'service' => 'pusher',
+            'key' => 'pusher-public-key',
+            'cluster' => 'ap1',
+            'host' => '127.0.0.1',
+            'port' => 8080,
+            'scheme' => 'http',
+            'channel' => 'admin.consents',
+            'event' => 'consents.changed',
+        ]));
+        expect($response->getContent())->not->toContain('pusher-very-secret', 'pusher-app-id-77');
+    });
+
+    // ADM-063
+    test('nothing about Pusher when a setting is missing', function (string $setting, mixed $blank) {
+        usePusherDriver();
+        config(["broadcasting.connections.pusher.{$setting}" => $blank]);
+
+        $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->where('realtime', null));
+    })->with([
+        'no key' => ['key', ''],
+        'no secret' => ['secret', ''],
+        'no app id' => ['app_id', ''],
+        'no cluster' => ['options.cluster', null],
+    ]);
 });

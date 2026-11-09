@@ -4,16 +4,21 @@ import type { Locator, Page } from '@playwright/test';
 import { ADMIN_STORAGE_STATE, acceptAsNewVisitor } from './support/admin';
 import { settleAnimations } from './support/consent';
 import {
+    PUSHER_CUSTOM_HOST,
+    PUSHER_HOSTED,
+    PUSHER_HOSTED_SOCKET,
     REALTIME,
     fakeReverb,
+    pageProps,
     setRealtime,
     watchRefetches,
 } from './support/live';
 
 /**
  * The live admin overview. Case ids refer to tests/cases/admin.yaml. A fake
- * socket stands in for Reverb, so CI needs no server. Only the last test uses
- * a real one, and it runs only with E2E_REVERB=1.
+ * socket stands in for the socket service, so CI needs no server and no Pusher
+ * account. Only the last two tests use a real one, and they run only with
+ * E2E_REVERB=1 or E2E_PUSHER_LOCAL=1.
  */
 
 function indicator(page: Page): Locator {
@@ -186,6 +191,56 @@ test.describe('with a fake socket', () => {
         await expect.poll(() => reverb.closed()).toBe(true);
     });
 
+    test('ADM-066 connects to hosted Pusher, shows Live and refetches on a change', async ({
+        page,
+    }) => {
+        const errors = collectPageErrors(page);
+        const refetches = watchRefetches(page);
+        await setRealtime(page, PUSHER_HOSTED);
+        const pusher = await fakeReverb(page, PUSHER_HOSTED_SOCKET);
+
+        await page.goto('/admin');
+        await expect(indicator(page)).toHaveText(/^Live/);
+        await page.waitForLoadState('networkidle');
+
+        pusher.announce();
+
+        await expect.poll(() => refetches.times.length).toBe(1);
+        expect(errors).toEqual([]);
+    });
+
+    test('ADM-066 connects to the given host when the Pusher config has one', async ({
+        page,
+    }) => {
+        await setRealtime(page, PUSHER_CUSTOM_HOST);
+        await fakeReverb(page);
+
+        await page.goto('/admin');
+
+        await expect(indicator(page)).toHaveText(/^Live/);
+    });
+
+    test('ADM-066 no Pusher secret or app id appears in the page props', async ({
+        page,
+    }) => {
+        await setRealtime(page, PUSHER_HOSTED);
+        await fakeReverb(page, PUSHER_HOSTED_SOCKET);
+
+        await page.goto('/admin');
+        await expect(indicator(page)).toHaveText(/^Live/);
+
+        const props = await pageProps(page);
+
+        expect(Object.keys(props.realtime as object).sort()).toEqual([
+            'channel',
+            'cluster',
+            'event',
+            'key',
+            'service',
+        ]);
+        expect(JSON.stringify(props)).not.toMatch(/app_?id|app_?secret/i);
+    });
+
     for (const colorScheme of ['light', 'dark'] as const) {
         test(`ADM-059 the indicator fits 320px and passes axe in ${colorScheme} mode`, async ({
             page,
@@ -265,6 +320,50 @@ test.describe('with a real Reverb server', () => {
         baseURL,
     }) => {
         await page.goto('/admin');
+        await expect(indicator(page)).toHaveText(/^Live/, { timeout: 15_000 });
+
+        const before = await readNumber(totalAccepted(page));
+        await acceptAsNewVisitor(browser, baseURL);
+
+        await expect
+            .poll(() => readNumber(totalAccepted(page)), { timeout: 15_000 })
+            .toBeGreaterThan(before);
+    });
+});
+
+test.describe('with the pusher connection on a local Reverb server', () => {
+    test.use({ storageState: ADMIN_STORAGE_STATE });
+    test.skip(
+        process.env.E2E_PUSHER_LOCAL !== '1',
+        'Needs Reverb, a queue worker and the pusher connection pointed at Reverb through PUSHER_HOST. Set E2E_PUSHER_LOCAL=1 to run it.',
+    );
+
+    test('ADM-067 an accept in one browser updates the overview in another', async ({
+        page,
+        browser,
+        baseURL,
+    }) => {
+        await page.goto('/admin');
+
+        const props = await pageProps(page);
+        const realtime = props.realtime as Record<string, unknown>;
+
+        expect(realtime.service).toBe('pusher');
+        expect(realtime.host).toBeTruthy();
+        expect(Object.keys(realtime).sort()).toEqual([
+            'channel',
+            'cluster',
+            'event',
+            'host',
+            'key',
+            'port',
+            'scheme',
+            'service',
+        ]);
+        expect(await page.content()).not.toContain(
+            process.env.PUSHER_APP_SECRET ?? 'meridian-local-secret',
+        );
+
         await expect(indicator(page)).toHaveText(/^Live/, { timeout: 15_000 });
 
         const before = await readNumber(totalAccepted(page));
