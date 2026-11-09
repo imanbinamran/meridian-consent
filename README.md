@@ -46,9 +46,10 @@
 ## Review it in 5 minutes
 
 > [!IMPORTANT]
-> **Admin sign-in**
+> **Live site and admin sign-in**
 >
-> - **Portal:** [meridian-news.laravel.cloud/admin](https://meridian-news.laravel.cloud/admin)
+> - **Live site:** [meridian-news.laravel.cloud](https://meridian-news.laravel.cloud)
+> - **Admin portal:** [meridian-news.laravel.cloud/admin](https://meridian-news.laravel.cloud/admin)
 > - **Email:** `admin@meridian.test`
 > - **Password:** `123456`
 >
