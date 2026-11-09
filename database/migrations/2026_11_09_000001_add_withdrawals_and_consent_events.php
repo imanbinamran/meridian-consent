@@ -15,21 +15,31 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('consents', function (Blueprint $table) {
-            $table->timestamp('withdrawn_at')->nullable();
-        });
+        // Each step checks first, so a run that failed part way can be re-run.
+        if (! Schema::hasColumn('consents', 'withdrawn_at')) {
+            Schema::table('consents', function (Blueprint $table) {
+                $table->timestamp('withdrawn_at')->nullable();
+            });
+        }
 
-        Schema::create('consent_events', function (Blueprint $table) {
-            $table->id();
-            $table->uuid('guid')->index();
-            $table->string('type', 16);
-            $table->unsignedSmallInteger('version');
-            $table->timestamp('occurred_at');
-        });
+        if (! Schema::hasTable('consent_events')) {
+            Schema::create('consent_events', function (Blueprint $table) {
+                $table->id();
+                $table->uuid('guid')->index();
+                $table->string('type', 16);
+                $table->unsignedSmallInteger('version');
+                $table->timestamp('occurred_at');
+            });
+        }
 
         DB::statement(
             "insert into consent_events (guid, type, version, occurred_at)
-             select guid, 'accepted', version, accepted_at from consents order by id",
+             select guid, 'accepted', version, accepted_at from consents
+             where not exists (
+                 select 1 from consent_events
+                 where consent_events.guid = consents.guid and consent_events.type = 'accepted'
+             )
+             order by id",
         );
     }
 

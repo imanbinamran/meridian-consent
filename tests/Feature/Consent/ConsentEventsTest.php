@@ -5,7 +5,9 @@ use App\Models\ConsentDecline;
 use App\Models\ConsentEvent;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConsentDemoSeeder;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
 use function Tests\Feature\Consent\acceptedCookieValue;
@@ -198,6 +200,38 @@ it('backfills one accepted event per existing consent', function () {
         ['11111111-1111-4111-8111-111111111111', 'accepted', 1, '2026-10-01 01:02:03'],
         ['22222222-2222-4222-8222-222222222222', 'accepted', 2, '2026-10-02 04:05:06'],
     ])->and(Consent::query()->whereNotNull('withdrawn_at')->count())->toBe(0);
+});
+
+// CON-092
+it('finishes the migration after a run that failed part way', function () {
+    $migration = require database_path('migrations/2026_11_09_000001_add_withdrawals_and_consent_events.php');
+    $migration->down();
+
+    Schema::table('consents', fn (Blueprint $table) => $table->timestamp('withdrawn_at')->nullable());
+    DB::table('consents')->insert([
+        'guid' => '11111111-1111-4111-8111-111111111111',
+        'version' => 1,
+        'accepted_at' => '2026-10-01 01:02:03',
+    ]);
+
+    $migration->up();
+
+    expect(Schema::hasTable('consent_events'))->toBeTrue()
+        ->and(ConsentEvent::query()->where('type', 'accepted')->count())->toBe(1);
+});
+
+// CON-092
+it('adds no second accepted event when the migration runs again', function () {
+    $migration = require database_path('migrations/2026_11_09_000001_add_withdrawals_and_consent_events.php');
+    $first = Consent::factory()->create();
+    Consent::factory()->withdrawn()->create();
+    ConsentEvent::query()->where('guid', $first->guid)->delete();
+
+    $migration->up();
+    $migration->up();
+
+    expect(ConsentEvent::query()->where('type', 'accepted')->count())->toBe(2)
+        ->and(ConsentEvent::query()->where('guid', $first->guid)->pluck('type')->all())->toBe(['accepted']);
 });
 
 // CON-086
