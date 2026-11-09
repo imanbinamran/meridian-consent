@@ -6,7 +6,6 @@ use App\Models\ConsentEvent;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConsentDemoSeeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
 use function Tests\Feature\Consent\acceptedCookieValue;
@@ -35,11 +34,12 @@ it('writes one accepted event that matches the new row', function () {
 
 // CON-080
 it('saves neither the row nor the event if the event cannot be written', function () {
-    Schema::drop('consent_events');
+    ConsentEvent::creating(fn () => throw new RuntimeException('The event could not be written.'));
 
     $this->post(route('consent.accept'))->assertServerError();
 
-    expect(Consent::count())->toBe(0);
+    expect(Consent::count())->toBe(0)
+        ->and(ConsentEvent::count())->toBe(0);
 });
 
 // CON-081
@@ -79,11 +79,12 @@ it('withdraws the record when a verified visitor declines', function () {
 // CON-082
 it('saves neither the withdrawal nor the event if the event cannot be written', function () {
     $value = recordedCookieValue();
-    Schema::drop('consent_events');
+    ConsentEvent::creating(fn () => throw new RuntimeException('The event could not be written.'));
 
     $this->withUnencryptedCookie('consent', $value)->post(route('consent.decline'))->assertServerError();
 
-    expect(Consent::sole()->withdrawn_at)->toBeNull();
+    expect(Consent::sole()->withdrawn_at)->toBeNull()
+        ->and(ConsentEvent::query()->where('type', 'withdrawn')->count())->toBe(0);
 });
 
 // CON-083
