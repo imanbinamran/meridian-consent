@@ -29,10 +29,10 @@
   <a href="#review-it-in-5-minutes">5-minute review</a> ·
   <a href="#the-brief-line-by-line">The brief</a> ·
   <a href="#run-it-locally">Run it locally</a> ·
+  <a href="#beyond-the-brief">Beyond the brief</a> ·
   <a href="#read-the-code">Read the code</a> ·
   <a href="#try-to-break-it">Try to break it</a> ·
   <a href="#decisions-and-known-limits">Decisions and limits</a> ·
-  <a href="#beyond-the-brief">Beyond the brief</a> ·
   <a href="#go-deeper">Go deeper</a>
 </p>
 
@@ -116,6 +116,30 @@ Log in at http://localhost:8000/login with `admin@meridian.test` / `password`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Beyond the brief
+
+You don't need any of this to mark the brief. It's here so you can tell what was asked for from what I added.
+
+- event history for each consent, shown on its own page in the admin
+- withdrawal, when someone declines after accepting
+- coarse device data, kept on accept only
+- browser and device breakdowns on the overview
+- the database check that stops forged cookies
+- HttpOnly on both cookies
+- five readable sample stories at `/stories/{slug}`, behind the same consent gate ([STR-001](tests/cases/stories.yaml#L165) to [STR-022](tests/cases/stories.yaml#L683))
+- a live admin overview over free Pusher or Laravel Reverb, off until it's switched on ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
+
+The admin overview, with seeded demo data:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/admin-overview-dark.png">
+    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, consent health, weekly accept rate, renewals due, and who accepted by device, browser and OS" width="100%">
+  </picture>
+</p>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Read the code
 
 Five files carry the consent logic. Read them in this order.
@@ -194,30 +218,6 @@ What it doesn't do yet:
 - **Ready for right-to-left.** Layouts use logical properties, so a Jawi or Arabic edition would mirror correctly. I tested it with `dir="rtl"`.
 
 </details>
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Beyond the brief
-
-You don't need any of this to mark the brief. It's here so you can tell what was asked for from what I added.
-
-- event history for each consent, shown on its own page in the admin
-- withdrawal, when someone declines after accepting
-- coarse device data, kept on accept only
-- browser and device breakdowns on the overview
-- the database check that stops forged cookies
-- HttpOnly on both cookies
-- five readable sample stories at `/stories/{slug}`, behind the same consent gate ([STR-001](tests/cases/stories.yaml#L165) to [STR-022](tests/cases/stories.yaml#L683))
-- a live admin overview over free Pusher or Laravel Reverb, off until it's switched on ([ADM-056](tests/cases/admin.yaml#L1373) to [ADM-067](tests/cases/admin.yaml#L1830))
-
-The admin overview, with seeded demo data:
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/admin-overview-dark.png">
-    <img src="docs/readme/admin-overview-light.png" alt="Admin overview with accept, decline and withdrawal totals, a 30-day chart, consent health, weekly accept rate, renewals due, and who accepted by device, browser and OS" width="100%">
-  </picture>
-</p>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
